@@ -4,7 +4,6 @@
 
 # ![GitHub License](https://img.shields.io/github/license/AndyTechnologies/Webeact?style=plastic&logoColor=gray&logoSize=auto&color=27c)
 
-
 ---
 
 ## 🚀 ¿Qué es Webeact?
@@ -26,17 +25,6 @@ Webeact combina la simplicidad de los **web standards** (Custom Elements, Shadow
 ```bash
 npm install webeact
 ```
-
----
-
-## 🤝 Contribuir  
-¡Bienvenidos a contribuir! Lee nuestra [Guía de Contribución](CONTRIBUTING.md) para empezar.  
-
-### Pasos para contribuir:  
-1. Haz un fork del repositorio.  
-2. Crea una rama nueva: `git checkout -b feature/nueva-funcion`.  
-3. Realiza tus cambios y ejecuta pruebas: `npm test`.  
-4. Envía tu pull request.  
 
 ---
 
