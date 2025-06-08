@@ -1,6 +1,6 @@
 # Webeact 🌐  
 
-> **Una librería para construir interfaces reactivas con web components, inspirada en los hooks de React/Preact y en las plantillas de Astro. Optimizada para integración con servidores Express.**
+> **Una librería para construir interfaces reactivas con web components, inspirada en los hooks de React/Preact y en las plantillas de Astro. Optimizada para integración con servidores Express y SSE.**
 
 # ![GitHub License](https://img.shields.io/github/license/AndyTechnologies/Webeact?style=plastic&logoColor=gray&logoSize=auto&color=27c)
 
@@ -8,14 +8,14 @@
 
 ## 🚀 ¿Qué es Webeact?
 
-Webeact combina la simplicidad de los **web standards** (Custom Elements, Shadow DOM) con un flujo de trabajo familiar para desarrolladores de React, permitiendo crear aplicaciones híbridas que aprovechan el **server-side rendering (SSR)** y el **client-side rendering (CSR)**. Ideal para proyectos que buscan velocidad, SEO y compatibilidad sin depender de frameworks pesados.
+Webeact combina la simplicidad de los **web standards** (Custom Elements, Shadow DOM) con un flujo de trabajo familiar para desarrolladores de React, permitiendo crear aplicaciones híbridas que aprovechan el **server-side events (SSE)** y el **client-side rendering (CSR)**. Ideal para proyectos que buscan velocidad, SEO y compatibilidad sin depender de frameworks pesados.
 
 ---
 
 ## 🔍 Características principales  
 - ✅ **React-like hooks**: Usa `useState`, `useEffect` y más con sintaxis intuitiva.  
 - 🧱 **Web Components nativos**: Sin transpiladores ni dependencias externas.  
-- ⚡ **Renderizado híbrido**: Combina SSR (Express) y CSR para cargas rápidas y dinamismo.  
+- ⚡ **Renderizado híbrido**: Combina SSE (Express) y CSR para cargas rápidas y dinamismo.  
 - 🔗 **Integración con Express**: Middleware listo para renderizar componentes desde el servidor.  
 - 📦 **Ligera**: Menos de 5KB minificada.
 
