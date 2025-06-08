@@ -1,0 +1,19 @@
+{
+  "name": "auto-wc",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --run start -- --watch --watch-path=./components --watch-path=./public"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.11.0",
+  "dependencies": {
+    "express": "^5.1.0",
+    "glob": "^11.0.2"
+  }
+}
