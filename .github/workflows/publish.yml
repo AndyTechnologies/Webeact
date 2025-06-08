@@ -12,6 +12,9 @@ jobs:
         with:
           node-version: 24.1.0
           registry-url: https://registry.npmjs.org/ 
-      - run: npm publish
+      - name: Install dependencies
+        run: npm ci
+      - name: Publicar en NPM
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_SECRET }}
+        run: npm publish
