@@ -1,16 +1,24 @@
 {
   "name": "webeact",
   "version": "0.1.0",
-  "description": "",
+  "description": "Una librería para construir interfaces reactivas con web components, inspirada en los hooks de React/Preact y en las template de Astro. Optimizada para integración con servidores Express.",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node --watch example/server.js",
-    "dev": "node --watch-path=. --watch example/server.js "
+    "dev": "node --watch-path=. --watch example/server.js"
   },
-  "keywords": [],
+  "keywords": ["web-components", "react-like", "express", "astro-like", "hooks"],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndyTechnologies/Webeact.git" 
+  },
+  "bugs": {
+    "url": "https://github.com/AndyTechnologies/Webeact/issues" 
+  },
+  "homepage": "https://github.com/AndyTechnologies/Webeact#readme", 
   "packageManager": "pnpm@10.11.0",
   "dependencies": {
     "express": "^5.1.0",
