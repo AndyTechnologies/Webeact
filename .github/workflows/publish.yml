@@ -14,5 +14,5 @@ jobs:
           registry-url: https://registry.npmjs.org/
       - name: Publicar en NPM
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_SECRET }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_SECRET2 }}
         run: npm publish
