@@ -5,8 +5,8 @@ import * as fs from 'fs';
 
 const app = express.Router("/webeact/api");
 
-const DIRNAME = process.env.PUBLIC_DIRECTORY || path.join(process.cwd(), 'public');
-const CMPNAME = process.env.COMPONENTS_DIRECTORY || path.join(process.cwd(), 'components');
+export const DIRNAME = process.env.PUBLIC_DIRECTORY || path.join(process.cwd(), 'public');
+export const CMPNAME = process.env.COMPONENTS_DIRECTORY || path.join(process.cwd(), 'components');
 
 function renderComponent(name,attrs) {
 	const template = fs.readFileSync(`${CMPNAME}/${name}.html`, 'utf-8');
