@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node --watch example/server.js",
-    "dev": "node --watch-path=example --watch-path=Lib --watch-path=src  --watch example/server.js"
+    "dev": "node --watch-path=example --watch-path=Lib --watch-path=src  --watch example/server.js",
+    "prepare": "minify-js ."
   },
   "keywords": [
     "web-components",
@@ -25,9 +26,12 @@
     "url": "https://github.com/AndyTechnologies/Webeact/issues"
   },
   "homepage": "https://github.com/AndyTechnologies/Webeact#readme",
-  "packageManager": "pnpm@10.11.0",
+  "packageManager": "pnpm@10.12.1",
   "dependencies": {
     "express": "^5.1.0",
     "glob": "^11.0.2"
+  },
+  "devDependencies": {
+    "@adamlui/minify.js": "^1.8.6"
   }
 }
