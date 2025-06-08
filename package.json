@@ -1,12 +1,12 @@
 {
-  "name": "auto-wc",
-  "version": "1.0.0",
+  "name": "webeact",
+  "version": "0.1.0",
   "description": "",
-  "main": "server.js",
+  "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --run start -- --watch --watch-path=./components --watch-path=./public"
+    "start": "node --watch example/server.js",
+    "dev": "node --watch-path=. --watch example/server.js "
   },
   "keywords": [],
   "author": "",

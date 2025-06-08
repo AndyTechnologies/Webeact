@@ -3,10 +3,10 @@ import path from 'path';
 import { glob } from 'glob';
 import * as fs from 'fs';
 
-const app = express.Router("/webeact/api");
+const app = express.Router();
 
-export const DIRNAME = process.env.PUBLIC_DIRECTORY || path.join(process.cwd(), 'public');
 export const CMPNAME = process.env.COMPONENTS_DIRECTORY || path.join(process.cwd(), 'components');
+export const LIBNAME = process.env.LIB_DIRECTORY || path.join(process.cwd(), 'Lib');
 
 function renderComponent(name,attrs) {
 	const template = fs.readFileSync(`${CMPNAME}/${name}.html`, 'utf-8');
@@ -17,8 +17,8 @@ function renderComponent(name,attrs) {
 	return rendered;
 }
 
-// Servir archivos estáticos (HTML, CSS, JS)
-app.use(express.static(DIRNAME));
+// Servir todos los scripts del lib
+app.use(express.static(LIBNAME))
 
 app.get('/component/:name', async (req, res) => {
 	const componentName = req.params.name;
@@ -38,4 +38,13 @@ app.get('/files', async (_req, res) => {
 	); // res.send
 }); // app.get
 
-export default app;
+export function mountWebeact (ExpressApp) {
+	ExpressApp.use('/webeact', app);
+	return app;
+};
+
+export default {
+	mountWebeact,
+	CMPNAME,
+	LIBNAME
+};
