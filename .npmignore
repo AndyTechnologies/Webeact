@@ -1,0 +1,7 @@
+.*
+.github
+example
+components
+node_modules
+*lock.*
+*.tgz
