@@ -1,4 +1,4 @@
-import { Element } from "/webeact/Element.js";
+import { Element } from "/webeact/Element.min.js";
 
 window.addEventListener("load", () => {
 	

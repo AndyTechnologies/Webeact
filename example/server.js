@@ -1,5 +1,5 @@
 import express from 'express';
-import { mountWebeact, LIBNAME } from '../src/index.js';
+import { mountWebeact, LIBNAME } from '../src/index.min.js';
 import path from 'path';
 
 const app = express();

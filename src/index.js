@@ -67,11 +67,6 @@ async function getFilesNames() {
 		.map(s => s.toLowerCase());
 }
 
-export function getFiles() {
-	return getFilesNames()
-		.then(files => files.map(s => s.toLowerCase()));
-}
-
 export function mountWebeact (ExpressApp) {
 	ExpressApp.use('/webeact', app);
 	return app;

@@ -1,3 +1,4 @@
+import { Context } from './Context.min.js';
 
 export class Element extends HTMLElement {
 	// El tiempo en el que un script externo (importado con src) es nuevamente cargado o recogido desde el cache
@@ -14,36 +15,11 @@ export class Element extends HTMLElement {
     this.intersectionObserver = null; // Observer del ViewPort (para lazy loading)
     
     // Necesarios para el Context
-		this.dynamicCallbacks = new Map(); // Callbacks para ejecutarse cuando se actualice el estado de un atributo
-		this.states = [];       // Almacena los estados por orden
-		this.effects = []; 			// Effects (hook para ejecutar una función cuando cambia un estado)
-    this.hookIndex = 0;     // Índice actual para useState
-    
-    // Configuración base del contexto
-    this.Context = {
-    	// Registrar una función que se ejecutará cuando se actualice el estado de un atributo o slot
-      registerDynamicCallback: this.registerDynamicCallback.bind(this),
-      // Des-Registrar una función que se ejecutará cuando se actualice el estado de un atributo o slot
-      unregisterDynamicCallback: this.unregisterDynamicCallback.bind(this),
-      // Obtener los atributos que están siendo observados (API de Web-Components)
-      getAttributes: this.getAttributes.bind(this),
-      
-      /* Hooks */
-      
-      // Crear un estado reactivo que cuando cambie desencadenará un re-renderizado
-      useState: this.useState.bind(this),
-      // Una función que se ejecutará cuando cambien sus dependencias
-      useEffect: this.useEffect.bind(this),
-      // Activar o desactivar pantalla completa
-      useFullScreen: this.useFullScreen.bind(this),
-      // Intercambia los estados de pantalla completa
-      useToggleFullScreen: this.useToggleFullScreen.bind(this),
-      // Hace una transición de view (hace un re-render diferido)
-      useViewTransition: this.useViewTransition.bind(this),
-      // Crea un escucha para Server-Side-Events
-      // (Custom-Events debe ser un objeto donde las key sean el nombre del evento y el valor su callback)
-      useSSE: this.useSSE.bind(this),
-    };
+    this.Context = new Context(
+			this._deferRender.bind(this),
+			this.hasAttribute.bind(this), 
+			this.getAttribute.bind(this)
+    );
     
     // Extensión del contexto por componentes hijos
     this.extendContext();
@@ -59,160 +35,15 @@ export class Element extends HTMLElement {
       this.pendingRender = false;
     });
   }
-  
-  
-  
-/* Métodos del Context */
-
-// Registrar una funcion que se ejecutará cuando se actualice el estado
-// de un atributo o slot
-registerDynamicCallback(key, callback, metadata = null, context = this, ensureNoDuplicates = true) {
-	
-	if (ensureNoDuplicates){
-		this.unregisterDynamicCallback(key, callback); // no duplicates
-	}
-	
-	if (!context.dynamicCallbacks.has(key)) {
-	  context.dynamicCallbacks.set(key, []);
-	}
-	
-	context.dynamicCallbacks.get(key).push({
-		callback, 
-		metadata, 
-		oldData: this.hasAttribute(key) ? this.getAttribute(key) : null 
-	});
-}
-
-// Quitar una funcion que se había registrado para ejecutarse cuando se actualice el estado
-// de un atributo o slot
-unregisterDynamicCallback(key, callback, context = this) {
-	if (context.dynamicCallbacks.has(key)) {
-		const callbacks = context.dynamicCallbacks.get(key).filter(
-	    item => item.callback === callback // quitar los callbacks iguales
-	  );
-	  context.dynamicCallbacks.set(key, callbacks);
-	}
-}
-
-// Crea una view transition para una actualización dinámica de elementos por updateUI
-useViewTransition(updateUI, readyCallback = () => {}, finishedCallback = () => {}) {
-	const transition = document.startViewTransition(updateUI);
-	transition.ready.then(readyCallback)
-	transition.finished.then(finishedCallback)
-	return transition;
-}
-
-// Crea un escucha para Server-Side-Events
-// (Custom-Events debe ser un objeto donde las key sean el nombre del evento y el valor su callback)
-useSSE(source, onMessage, onError, customsEvents = {}) {
-	const eventSource = new EventSource(source);
-	eventSource.onmessage = onMessage;
-	eventSource.onerror = onError;
-	// Registrar todos los customs events
-	Object.entries(customsEvents).forEach((event,clbk) => eventSource.addEventListener(event, clbk))
-	return eventSource;
-}
-
-// Activa o Desactiva la pantalla completa
-useFullScreen(enable = true){
-	if (enable && document.fullscreenEnabled && document.fullscreenElement ===  null){
-		return this.requestFullscreen();
-	}
-	if(!enable && document.fullscreenEnabled && document.fullscreenElement !==  null){
-		return document.exitFullscreen();
-	}
-	return null;
-}
-
-// Intercambia los estados de pantalla completa
-useToggleFullScreen() {
-	if (!document.fullscreenEnabled) return null;
-	if( document.fullscreenElement !== null ) {
-		return document.exitFullscreen();
-	}else{
-		return this.requestFullscreen()
-	}
-}
-
-// Hook para que una función se ejecute 1 vez (la primera vez) 
-// y después solo cuando cambien sus params
-useEffect(callback, params) {
-	let areEquals = true; // Si los params son iguales o no
-	
-	// 1. Obtener el índice actual y avanzar el contador
-  const currentIndex = this.hookIndex++;
-	
-	// 2. Verificar si el callback ya existe
-	if(!this.effects[currentIndex]){
-		areEquals = false // se ejecutará porque no existe
-	}else{
-		// 3. Verificar si los params son iguales
-		const [_,oldParams] = Array.from(this.effects[currentIndex]);
-		if (oldParams.length !== params.length) // longitudes distintas para evitar bucles
-			// 4. Si no son iguales, se ejecutará porque los params son diferentes
-			areEquals = false;
-			// 5. Sino verificar si los params son iguales uno a uno (mas costoso)
-		else for (let i = 0; i < oldParams.length; i++) {
-		    if (!Object.is(oldParams[i], params[i])) {
-					areEquals = false; break; // Una vez un parametro ha cambiado, se vuelve a ejecutar
-		    }
-		  }
-	}
-	
-	// Si los params son iguales, no se ejecutará 
-	if(!areEquals){
-		this.effects[currentIndex] = [callback, params];
-		callback(...params);
-	}
-}
-
-// Hook para tener un estado reactivo que cuando cambie desencadenará un re-renderizado
-useState(initialValue) {
-	// 1. Obtener el índice actual y avanzar el contador
-  const currentIndex = this.hookIndex++;
-	
-  // 2. Inicializar el estado si no está definido
-  if (this.states[currentIndex] === undefined) {
-    this.states[currentIndex] = initialValue;
-  }
-	
-	// 3. Crear función setter
-	const setState = (newValue) => {
-		// 4. Obtener el valor actual (soportando funciones)
-		const value = typeof newValue === 'function' 
-      ? newValue(this.states[currentIndex]) 
-      : newValue;
-
-    // 5. Solo actualizar si el valor cambia
-    if (Object.is(this.states[currentIndex], value)) return;
-		
-	  // 6. Actualizar estado
-	  this.states[currentIndex] = value;
-	  
-		// 7. Programar re-renderizado
-		this._deferRender();
-	};
-	
-	return [this.states[currentIndex], setState];
-}
-
-// Obtener los atributos que están siendo observados
-getAttributes() {
-  const attrs = {};
-  this.constructor.observedAttributes.forEach(attr => {
-    attrs[attr] = this.getAttribute(attr);
-  });
-  return attrs;
-}
 
 /* Métodos que deben implementar los hijos */
   
   // Se llama luego de cada renderizado
   rendered() {}
-  // Extender el contexto (para extender funciones y variables)
-  extendContext() {}
   // Se llama cuando el componente se conecta al DOM
   onConnected() {}
+  // Extender el contexto (para extender funciones y variables)
+  extendContext() {}
   // API de WC: Atributos por los que se va a disparar el attributeChangedCallback
   static get observedAttributes() { return []; }
   
@@ -225,7 +56,7 @@ getAttributes() {
 
   reexecuteDynamicScripts(){
 	  // 1 - Reiniciar contador de hooks antes de cada re-ejecución	
-	  this.hookIndex = 0;
+	  this.Context.hookIndex = 0;
   	// 2 - Reiniciar addEventListeners de todos los elementos hijos del ShadowDOM
 		this.shadow.querySelectorAll("*").forEach(elmnt => {
 			const e = elmnt.cloneNode(true);
@@ -301,10 +132,12 @@ getAttributes() {
 	// Ejecutar script en contexto seguro
 	executeScript(scriptElement) {
 		// Agregar funciones globales al window
-		Object.entries(this.Context).forEach(([name, func]) => {
+		Object.entries(this.Context.callbacks).forEach(([name, func]) => {
 		  if (typeof func === "function") {
 	    	window[name] = func;
-		  }
+		  }else{
+					console.log(`No se puede ejecutar ${name} porque no es una función: ${typeof func}`);
+			}
 		});
 		// Agregar contexto al window
 		window.ctx = this.Context;
@@ -413,7 +246,7 @@ getAttributes() {
   // Llama a los dynamicCallbacks con el nuevo valor del atributo y re-ejecuta los scripts con data-dynamic
   performUpdate() {
     // Ejecutar callbacks para los atributos con cambios
-		Object.entries(this.dynamicCallbacks).forEach((key, { callback, metadata }) => {
+		Object.entries(this.Context.dynamicCallbacks).forEach((key, { callback, metadata }) => {
 			// Si existe el atributo y el valor ha cambiado
 			if( this.hasAttribute(key) && this.getAttribute(key) !== metadata.oldData ){
 				try {
