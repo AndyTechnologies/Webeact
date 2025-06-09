@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node --watch example/server.js",
     "dev": "pnpm run lint && node --watch-path=example --watch-path=Lib --watch-path=src  --watch example/server.js",
-    "prepublishOnly": "rm -rf dist && pnpm run lint && pnpm run minify && pnpm run size",
+    "prepublishOnly": "rm -rf dist && pnpm run lint && pnpm run minify",
     "lint": "eslint --fix .",
     "minify": "minify-js src dist && minify-js Lib ../dist"
   },
