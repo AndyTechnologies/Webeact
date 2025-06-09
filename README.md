@@ -2,11 +2,12 @@
 
 **Una librería para construir interfaces reactivas con web components, inspirada en los hooks de React/Preact y en las plantillas de Astro. Optimizada para integración con servidores Express y SSE.**
 
-![GitHub License](https://badgen.net/github/license/AndyTechnologies/Webeact)
-![GitHub Contributors](https://badgen.net/github/contributors/AndyTechnologies/Webeact)
-![GitHub Releases](https://badgen.net/github/release/AndyTechnologies/Webeact)
-![GitHub Commits](https://badgen.net/github/commits/AndyTechnologies/Webeact)
-![GitHub Deps](https://badgen.net/github/dependents-repo/AndyTechnologies/Webeact)
+![GitHub License](https://badgen.net/github/license/AndyTechnologies/webeact)
+![GitHub Contributors](https://badgen.net/github/contributors/AndyTechnologies/webeact)
+![GitHub Releases](https://badgen.net/github/release/AndyTechnologies/webeact)
+![GitHub Commits](https://badgen.net/github/commits/AndyTechnologies/webeact)
+![GitHub Deps](https://badgen.net/github/dependents-repo/AndyTechnologies/webeact)
+![Bundlephobia](https://badgen.net/bundlephobia/min/webeact)
 
 ---
 
