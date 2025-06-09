@@ -1,7 +1,7 @@
 import express from 'express';
-import path from 'path';
 import { glob } from 'glob';
-import * as fs from 'fs';
+import path from 'node:path';
+import * as fs from 'node:fs';
 
 const app = express.Router();
 
@@ -33,30 +33,30 @@ app.get('/files', async (_req, res) => {
 
 
 app.get("/connect", async (req, res) => {
-		// Cabeceras necesarias para el SSE
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    
-    // Mandar un mensaje inicial al cliente
-    res.write(`data: Webeact SSE\n\n`);
-    const sendEvent = data => {
+	// Cabeceras necesarias para el SSE
+	res.setHeader('Content-Type', 'text/event-stream');
+	res.setHeader('Cache-Control', 'no-cache');
+	res.setHeader('Connection', 'keep-alive');
+
+	// Mandar un mensaje inicial al cliente
+	res.write(`data: Webeact SSE\n\n`);
+	const sendEvent = data => {
     		res.write(`event: update\n`);
       	res.write(`data: ${JSON.stringify(data)}\n\n`);
-    }
-    
-    // mandar un mensaje con los archivos detectados
-    sendEvent(await getFilesNames())
-    // Y luego actualizar cada 2.5 segundos
-    const intervalId = setInterval(async () => {
-    	sendEvent(await getFilesNames())
-    }, 2500); // actualizar información cada 2.5 segundos
+	}
 
-    // When client closes connection, stop sending events
-    req.on('close', () => {
-        clearInterval(intervalId);
-        res.end();
-    });
+	// mandar un mensaje con los archivos detectados
+	sendEvent(await getFilesNames())
+	// Y luego actualizar cada 2.5 segundos
+	const intervalId = setInterval(async () => {
+    	sendEvent(await getFilesNames())
+	}, 2500); // actualizar información cada 2.5 segundos
+
+	// When client closes connection, stop sending events
+	req.on('close', () => {
+		clearInterval(intervalId);
+		res.end();
+	});
 });
 
 async function getFilesNames() {
