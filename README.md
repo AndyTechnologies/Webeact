@@ -20,7 +20,7 @@ Webeact combina la simplicidad de los **web standards** (Custom Elements, Shadow
 - ✅ **React-like hooks**: Usa `useState`, `useEffect` y más con sintaxis intuitiva.  
 - 🧱 **Web Components nativos**: Sin transpiladores ni dependencias externas.  
 - ⚡ **Renderizado híbrido**: Combina SSE (Express) y CSR para cargas rápidas y dinamismo.  
-- 🔗 **Integración con Express**: Middleware listo para renderizar componentes desde el servidor.  
+- 🔗 **Integración con Express o NodeJS HTTP Server**: Middleware listo para renderizar componentes desde el servidor.  
 - 📦 **Ligera**: Menos de 10KB minificada.
 
 ---

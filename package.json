@@ -1,19 +1,19 @@
 {
   "name": "webeact",
-  "version": "0.1.5",
-  "description": "Una librería para construir interfaces reactivas con web components, inspirada en los hooks de React/Preact y en las template de Astro. Optimizada para integración con servidores Express.",
+  "version": "0.1.8",
+  "description": "Una librería para construir interfaces reactivas con web components, inspirada en los hooks de React/Preact y en las template de Astro. Optimizada para integración con servidores",
   "main": "src/index.min.js",
   "type": "module",
   "scripts": {
     "start": "node --watch example/server.js",
     "dev": "pnpm run lint && node --watch-path=example --watch-path=Lib --watch-path=src  --watch example/server.js",
     "prepare": "pnpm run lint",
-    "lint": "eslint --fix ."
+    "lint": "eslint --fix .",
+    "minify": "minify-js src dist && minify-js Lib ../dist"
   },
   "keywords": [
     "web-components",
     "react-like",
-    "express",
     "astro-like",
     "hooks"
   ],
