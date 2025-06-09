@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node --watch example/server.js",
-    "dev": "pnpm run prepare && node --watch-path=example --watch-path=Lib --watch-path=src  --watch example/server.js",
-    "prepare": "pnpm run lint &&  minify-js -q ./Lib . && minify-js -q ./example . && minify-js -q ./src ./src",
+    "dev": "pnpm run lint && node --watch-path=example --watch-path=Lib --watch-path=src  --watch example/server.js",
+    "prepare": "pnpm run lint",
     "lint": "eslint --fix ."
   },
   "keywords": [
@@ -28,11 +28,8 @@
   },
   "homepage": "https://github.com/AndyTechnologies/Webeact#readme",
   "packageManager": "pnpm@10.12.1",
-  "dependencies": {
-    "express": "5.1.0",
-    "glob": "11.0.2"
-  },
   "devDependencies": {
+    "express": "5.1.0",
     "@adamlui/minify.js": "1.8.6",
     "eslint": "9.28.0",
     "globals": "16.2.0"

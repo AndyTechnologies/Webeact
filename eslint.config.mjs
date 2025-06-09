@@ -18,7 +18,7 @@ export default defineConfig([globalIgnores(["**/coverage", "**/node_modules"]), 
 
 		"no-trailing-spaces": "error",
 
-		"no-unused-vars": ["error", {
+		"no-unused-vars": ["warn", {
 			vars: "all",
 			args: "none",
 			ignoreRestSiblings: true,

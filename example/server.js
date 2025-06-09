@@ -1,12 +1,12 @@
 import express from 'express';
-import { mountWebeact, LIBNAME } from '../src/index.min.js';
-import path from 'node:path';
+import webeact from '../src/index.js';
+import path from 'path';
 
 const app = express();
 const PORT = 3000;
 const EXAMPLE_DIR = path.join(process.cwd(), 'example');
 
-mountWebeact(app);
+app.use("/webeact", webeact({logRequest: true}))
 
 app.get('/', (_req, res) => {
 	res.sendFile(path.join(EXAMPLE_DIR, 'index.html'));
@@ -18,6 +18,5 @@ app.use((req,_,next) => {
 })
 
 app.listen(PORT, () => {
-	console.log(LIBNAME);
 	console.log(`Servidor corriendo en http://localhost:${PORT} (${process.cwd()})`);
 });

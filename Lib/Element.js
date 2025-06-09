@@ -1,4 +1,4 @@
-import { Context } from './Context.min.js';
+import { Context } from './Context.js';
 
 export class Element extends HTMLElement {
 	// El tiempo en el que un script externo (importado con src) es nuevamente cargado o recogido desde el cache
