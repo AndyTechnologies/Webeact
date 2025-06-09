@@ -3,5 +3,5 @@
 example
 components
 node_modules
-*lock.*
 *.tgz
+dist
