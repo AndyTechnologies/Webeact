@@ -99,7 +99,6 @@ export class Element extends HTMLElement {
 			// Cargar template
 			const response = await fetch(this.templateSrc);
 			const html = await response.text();
-
 			// Crear template y clonar contenido
 			this.template = document.createElement('template');
 			this.template.innerHTML = html;
@@ -133,9 +132,9 @@ export class Element extends HTMLElement {
 	executeScript(scriptElement) {
 		// Agregar funciones globales al window
 		Object.entries(this.Context.callbacks).forEach(([name, func]) => {
-		  if (typeof func === "function") {
-	    	window[name] = func;
-		  }else{
+			if (typeof func === "function" || typeof func === "object") {
+				window[name] = func;
+			}else{
 				console.log(`No se puede ejecutar ${name} porque no es una función: ${typeof func}`);
 			}
 		});

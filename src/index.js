@@ -1,39 +1,50 @@
 import glob from "./iglob.js";
 import router from "./router.js";
+import templateEngine from "./ssr.js";
 import path from "path";
-import * as fs from "fs";
-
 const routing = router();
 
-export const CMPNAME =
+const CMPNAME =
 	process.env.COMPONENTS_DIRECTORY || path.join(process.cwd(), "components");
-export const LIBNAME =
+const LIBNAME =
 	process.env.LIB_DIRECTORY || path.join(process.cwd(), "Lib");
+const COMPONENTS_REFRESH_TIME = process.env.COMPONENTS_REFRESH_TIME || (2.5 * 1000); // 2.5 segundos
 
-function renderComponent(name, attrs) {
-	const template = fs.readFileSync(`${CMPNAME}/${name}.html`, "utf-8");
-	let rendered = template;
-	Object.entries(attrs).forEach(([key, value]) => {
-		rendered = rendered.replace(new RegExp(`{{${key}}`, "g"), value);
-	});
-	return rendered;
-}
+const renderMiddleware = templateEngine({
+	viewsDirectory: CMPNAME,
+	cacheSize: 25,
+	isProduction: process.env.NODE_ENV === "production",
+	streaming: true,
+	// Context functions avaiables for SSR
+	helpers: {
+		getFilesNames,
+		getEnv: () => {
+			return {
+				CMPNAME, LIBNAME, COMPONENTS_REFRESH_TIME, ...process.env
+			}
+		},
+		glob,
+		path,
+		thisRouter: routing,
+		createRouter: router
+	}
+});
 
 // Servir todos los scripts del lib
-routing.static(LIBNAME);
+routing.use_static(LIBNAME);
+routing.use(renderMiddleware);
 
-routing.get("/component/:name", async (req, res) => {
+routing.get("/component/:name", (req, res) => {
 	const componentName = req.params.name;
-	const attrs = req.query;
-	const html = renderComponent(componentName, attrs);
-	res.send(`${html}`);
+	const attrs = {componentName, ...req.query};
+	res.renderComponent(`${componentName}.html`, attrs);
 });
 
-routing.get("/files", async (_req, res) => {
-	res.send(await getFilesNames());
+routing.get("/files", (_req, res) => {
+	res.end(getFilesNames());
 });
 
-routing.get("/connect", async (req, res) => {
+routing.get("/connect", (req, res) => {
 	// Cabeceras necesarias para el SSE
 	res.setHeader("Content-Type", "text/event-stream");
 	res.setHeader("Cache-Control", "no-cache");
@@ -47,11 +58,11 @@ routing.get("/connect", async (req, res) => {
 	};
 
 	// mandar un mensaje con los archivos detectados
-	sendEvent(await getFilesNames());
+	sendEvent(getFilesNames());
 	// Y luego actualizar cada 2.5 segundos
-	const intervalId = setInterval(async () => {
-		sendEvent(await getFilesNames());
-	}, 2500); // actualizar información cada 2.5 segundos
+	const intervalId = setInterval(() => {
+		sendEvent(getFilesNames());
+	}, COMPONENTS_REFRESH_TIME); // actualizar información cada 2.5 segundos
 
 	// When client closes connection, stop sending events
 	req.on("close", () => {
@@ -60,7 +71,7 @@ routing.get("/connect", async (req, res) => {
 	});
 });
 
-async function getFilesNames() {
+function getFilesNames() {
 	return glob(path.join(CMPNAME, "*.*"))
 		.map((s) => s.split("/"))
 		.map((s) => s[s.length - 1])
@@ -73,16 +84,14 @@ Options:
 	alwaysCallToNext: after call to the middleware router, always call to the next handler (false)
 	logRequest: show request url informations before call middleware
 */
-export function createMiddleware(options = { alwaysCallToNext: false, logRequest: false }) {
+export function createMiddleware(
+	options = { alwaysCallToNext: false, logRequest: false },
+) {
 	return (req, res, next) => {
-		if( options.logRequest )
-			console.log(`Request Info:
-\tBase URL: ${req.baseUrl}
-\tURL: ${req.url}
-\tOriginal URL: ${req.originalUrl}
-`);
-		if( !routing.middleware(req, res) || options.alwaysCallToNext )
-			next(); // if the router don´t catch the request, call to next
+		if (options.logRequest)
+			console.log(`[LOG] - Request ${req.originalUrl} from ${req.ip}`);
+		// if the router don´t catch the request, call to next
+		if (!routing.middleware(req, res, next) || options.alwaysCallToNext) next();
 	};
 }
 

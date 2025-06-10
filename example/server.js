@@ -12,11 +12,6 @@ app.get('/', (_req, res) => {
 	res.sendFile(path.join(EXAMPLE_DIR, 'index.html'));
 });
 
-app.use((req,_,next) => {
-	console.log("Failed to serve the request: ", req.url);
-	next();
-})
-
 app.listen(PORT, () => {
 	console.log(`Servidor corriendo en http://localhost:${PORT} (${process.cwd()})`);
 });

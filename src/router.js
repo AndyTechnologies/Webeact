@@ -1,54 +1,68 @@
-import url from "url"
-import path from "path"
-import * as fs from "fs"
+import url from "url";
+import path from "path";
+import * as fs from "fs";
 
 // =======================
 // 1. Middleware para servir archivos estáticos
 // =======================
 function serveStatic(rootDir) {
+	// Asegurarnos de tener la ruta absoluta de la raíz
+	const absRoot = path.resolve(rootDir);
+	console.log(`Absolute Route: ${absRoot}`);
 	return function staticMiddleware(req, res) {
-		const parsedUrl = url.parse(req.url);
-		let pathname = decodeURIComponent(parsedUrl.pathname);
+		// Parseamos URL usando la clase URL para evitar sorpresas
+		const parsed = new URL(req.url, `http://${req.headers.host}`);
+		let pathname = decodeURIComponent(parsed.pathname);
 
-		// Evitar ataques de navegación de directorios
-		const safePath = path.normalize(pathname).replace(/^(\.\.[\/\\])+/, "");
-		const filePath = path.join(rootDir, safePath);
-		fs.stat(filePath, (err, stats) => {
-			if (err || !stats.isFile()) {
-				console.error(`Processing ${req.url} to ${pathname}`);
-				console.error("Root Directory:",rootDir);
-				console.error("Error en el procesamiento de archivo con fs.stat:", err);
+		// Normalize + quitar "../" + eliminar slash inicial
+		let safe = path.normalize(pathname).replace(/^(\.\.(\/|\\))+/g, "");
+		safe = safe.replace(/^[/\\]+/, "");
+		const filePath = path.join(absRoot, safe);
+
+		// No salirse de absRoot
+		if (!filePath.startsWith(absRoot + path.sep)) {
+			console.error("Forbidden on request");
+			return false;
+		}
+
+		if( !fs.existsSync(filePath) ){
+			return false;
+		}
+		const stats = fs.statSync(filePath);
+		if (!stats.isFile()) {
+			// NO enviamos respuesta aquí, delegamos al siguiente handler
+			console.error("Resource is not a file!");
+			return false;
+		}
+
+		// MIME types
+		const ext = path.extname(filePath).toLowerCase();
+		const mimeTypes = {
+			".html": "text/html; charset=utf-8",
+			".js": "application/javascript; charset=utf-8",
+			".css": "text/css; charset=utf-8",
+			".json": "application/json; charset=utf-8",
+			".png": "image/png",
+			".jpg": "image/jpeg",
+			".gif": "image/gif",
+			".txt": "text/plain; charset=utf-8",
+			".ico": "image/x-icon",
+		};
+		const contentType = mimeTypes[ext] || "application/octet-stream";
+
+		// Stream del archivo
+		res.writeHead(200, { "Content-Type": contentType });
+		const stream = fs.createReadStream(filePath);
+		stream.on("error", (streamErr) => {
+			console.error("Stream error:", streamErr);
+			if (!res.headersSent) {
 				res.writeHead(500, { "Content-Type": "text/plain" });
-				return res.end("File not Found");
 			}
-
-			// MIME types básicos
-			const ext = path.extname(filePath).toLowerCase();
-			const mimeTypes = {
-				".html": "text/html",
-				".js": "text/javascript",
-				".css": "text/css",
-				".json": "application/json",
-				".png": "image/png",
-				".jpg": "image/jpeg",
-				".gif": "image/gif",
-				".txt": "text/plain",
-				".ico": "image/x-icon",
-			};
-			const contentType = mimeTypes[ext] || "application/octet-stream";
-
-			// Enviar archivo
-			fs.readFile(filePath, (err, data) => {
-				if (err) {
-					console.error(`Error leyendo archivo: ${filePath}`, err);
-					res.writeHead(500, { "Content-Type": "text/plain" });
-					return res.end("Internal Server Error");
-				}
-
-				res.writeHead(200, { "Content-Type": contentType });
-				res.end(data);
-			});
+			return res.end("Internal Server Error");
 		});
+		stream.pipe(res);
+
+		return true;
 	};
 }
 
@@ -62,8 +76,18 @@ export class Router {
 			POST: [],
 			PUT: [],
 			DELETE: [],
-			STATIC: []
+			STATIC: [],
 		};
+		this.middlewares = [];
+	}
+
+	use(handler) {
+		if (typeof handler !== "function") {
+			throw new Error(
+				"Invalid usage of use middleware (handler must be a function)",
+			);
+		}
+		this.middlewares.push(handler);
 	}
 
 	set(method, route, handler) {
@@ -75,7 +99,7 @@ export class Router {
 					(item) => item.path === route,
 				) === -1
 			)
-				this.routes[method].push({path: route, handler}); // agrego la ruta
+				this.routes[method].push({ path: route, handler }); // agrego la ruta
 		}
 	}
 
@@ -99,13 +123,11 @@ export class Router {
 		this.delete(route, handler);
 	}
 
-	static(route, pathname) {
-		if (pathname === undefined){
-			pathname = route;
-			route = "/:file";
-		}
-		const handler = serveStatic(pathname);
-		this.set("STATIC", route, handler);
+	get_static(pathname){
+		return serveStatic(pathname);
+	}
+	use_static(pathname){
+		this.use(this.get_static(pathname))
 	}
 
 	// Middleware que ejecuta las rutas
@@ -113,6 +135,16 @@ export class Router {
 		const parsedUrl = url.parse(req.url, true);
 		const { pathname } = parsedUrl;
 		const method = req.method;
+		let route_result = true;
+
+		// Execute all middlewares
+		for (let idx = 0; idx < this.middlewares.length; idx++) {
+			const clbk = this.middlewares[idx];
+			const result = clbk(req, res, () => {});
+			if (result) {
+				break;
+			}
+		}
 
 		// Buscar ruta coincidente
 		let matchedRoute = this.routes[method].find((route) => {
@@ -121,7 +153,7 @@ export class Router {
 		});
 
 		// Si no se encuentra en el method del request, revisar en la STATIC
-		if( !matchedRoute ){
+		if (!matchedRoute) {
 			matchedRoute = this.routes["STATIC"].find((route) => {
 				const regex = this._pathToRegExp(route.path);
 				return regex.pattern.test(pathname);
@@ -132,11 +164,13 @@ export class Router {
 			const params = this._extractParams(matchedRoute.path, pathname);
 			req.params = params;
 			req.matchedRoutePath = matchedRoute.path;
-			const nextCall = matchedRoute.handler(req, res);
-			return ((typeof nextCall) === "boolean" ? nextCall : true);
+			const nextCall = matchedRoute.handler(req, res, () => {});
+			route_result &= typeof nextCall === "boolean" ? nextCall : true;
 		} else {
-			return false; // not found route (call to next)
+			route_result &= false; // not found route (call to next)
 		}
+
+		return route_result;
 	}
 
 	// Convierte rutas como /user/:id a expresiones regulares

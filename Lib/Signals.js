@@ -326,92 +326,88 @@ function trackDependency(signal) {
 	}
 }
 
-// Namespace para características avanzadas
-Signal.subtle = {
-	/**
-	 * Symbol para callback cuando una señal empieza a ser observada
-	 * @type {Symbol}
-	 */
-	watched: Symbol("watched"),
+export default class extends Signal{
+	// Namespace para características avanzadas
+	subtle = {
+		/**
+		 * Symbol para callback cuando una señal empieza a ser observada
+		 * @type {Symbol}
+		 */
+		watched: Symbol("watched"),
 
-	/**
-	 * Symbol para callback cuando una señal deja de ser observada
-	 * @type {Symbol}
-	 */
-	unwatched: Symbol("unwatched"),
+		/**
+		 * Symbol para callback cuando una señal deja de ser observada
+		 * @type {Symbol}
+		 */
+		unwatched: Symbol("unwatched"),
 
-	/**
-	 * Ejecuta un callback sin rastrear dependencias
-	 * @param {Function} callback - Función a ejecutar
-	 * @returns {*} Resultado del callback
-	 */
-	untrack(callback) {
-		const prevWatcher = currentWatcher;
-		const prevComputedStack = [...currentComputedStack];
-		currentWatcher = null;
-		currentComputedStack.length = 0;
-
-		try {
-			return callback();
-		} finally {
-			currentWatcher = prevWatcher;
+		/**
+		 * Ejecuta un callback sin rastrear dependencias
+		 * @param {Function} callback - Función a ejecutar
+		 * @returns {*} Resultado del callback
+		 */
+		untrack(callback) {
+			const prevWatcher = currentWatcher;
+			const prevComputedStack = [...currentComputedStack];
+			currentWatcher = null;
 			currentComputedStack.length = 0;
-			currentComputedStack.push(...prevComputedStack);
-		}
-	},
 
-	/**
-	 * Obtiene la señal computada actual que está rastreando dependencias
-	 * @returns {Computed|null} Señal computada actual o null
-	 */
-	currentComputed() {
-		return currentComputedStack.length > 0
-			? currentComputedStack[currentComputedStack.length - 1]
-			: null;
-	},
+			try {
+				return callback();
+			} finally {
+				currentWatcher = prevWatcher;
+				currentComputedStack.length = 0;
+				currentComputedStack.push(...prevComputedStack);
+			}
+		},
 
-	/**
-	 * Obtiene las dependencias de una señal
-	 * @param {Signal} signal - Señal a inspeccionar
-	 * @returns {Set<Signal>} Conjunto de señales dependientes
-	 */
-	introspectSources(signal) {
-		return new Set(signal._dependencies || []);
-	},
+		/**
+		 * Obtiene la señal computada actual que está rastreando dependencias
+		 * @returns {Computed|null} Señal computada actual o null
+		 */
+		currentComputed() {
+			return currentComputedStack.length > 0
+				? currentComputedStack[currentComputedStack.length - 1]
+				: null;
+		},
 
-	/**
-	 * Obtiene los suscriptores de una señal
-	 * @param {Signal} signal - Señal a inspeccionar
-	 * @returns {Set<Watcher|Computed>} Conjunto de suscriptores
-	 */
-	introspectSinks(signal) {
-		return new Set(signal._subscribers || []);
-	},
+		/**
+		 * Obtiene las dependencias de una señal
+		 * @param {Signal} signal - Señal a inspeccionar
+		 * @returns {Set<Signal>} Conjunto de señales dependientes
+		 */
+		introspectSources(signal) {
+			return new Set(signal._dependencies || []);
+		},
 
-	/**
-	 * Verifica si una señal tiene suscriptores
-	 * @param {Signal} signal - Señal a verificar
-	 * @returns {boolean} true si tiene suscriptores
-	 */
-	hasSinks(signal) {
-		return signal._subscribers?.size > 0 || false;
-	},
+		/**
+		 * Obtiene los suscriptores de una señal
+		 * @param {Signal} signal - Señal a inspeccionar
+		 * @returns {Set<Watcher|Computed>} Conjunto de suscriptores
+		 */
+		introspectSinks(signal) {
+			return new Set(signal._subscribers || []);
+		},
 
-	/**
-	 * Verifica si una señal tiene dependencias
-	 * @param {Signal} signal - Señal a verificar
-	 * @returns {boolean} true si tiene dependencias
-	 */
-	hasSources(signal) {
-		return signal._dependencies?.size > 0 || false;
-	},
+		/**
+		 * Verifica si una señal tiene suscriptores
+		 * @param {Signal} signal - Señal a verificar
+		 * @returns {boolean} true si tiene suscriptores
+		 */
+		hasSinks(signal) {
+			return signal._subscribers?.size > 0 || false;
+		},
+
+		/**
+		 * Verifica si una señal tiene dependencias
+		 * @param {Signal} signal - Señal a verificar
+		 * @returns {boolean} true si tiene dependencias
+		 */
+		hasSources(signal) {
+			return signal._dependencies?.size > 0 || false;
+		},
+	}
+	State = State;
+	Computed = Computed;
+	effect = effect;
 };
-
-// Exportar clases
-Signal.State = State;
-Signal.Computed = Computed;
-
-// Exportar funciones
-Signal.effect = effect;
-
-export default Signal;

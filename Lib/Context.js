@@ -1,3 +1,4 @@
+import Signals from './Signals.js';
 export class Context{
 	constructor(renderCallback, hasAttr, getAttr){
 		// Necesarios para el Context
@@ -20,6 +21,8 @@ export class Context{
 			useEffect: this.useEffect.bind(this),
 			useViewTransition: this.useViewTransition.bind(this),
 			useSSE: this.useSSE.bind(this),
+			// TC39/Proposal Signals Implementation
+			Signals
 		};
 		// Callback para actualizar el DOM
 		this._render = renderCallback;
