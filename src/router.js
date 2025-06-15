@@ -5,19 +5,28 @@ import * as fs from "fs";
 // =======================
 // 1. Middleware para servir archivos estáticos
 // =======================
+function parseURL(req){
+	const parsed = new URL(req.url, `http://${req.headers.host}`);
+	return decodeURIComponent(parsed.pathname);
+}
+
+function sanitizePath(pathname, absRoot){
+	// Normalize + quitar "../" + eliminar slash inicial
+	let safe = path.normalize(pathname).replace(/^(\.\.(\/|\\))+/g, "");
+	safe = safe.replace(/^[/\\]+/, "");
+	return path.join(absRoot, safe);
+}
+
 function serveStatic(rootDir) {
 	// Asegurarnos de tener la ruta absoluta de la raíz
 	const absRoot = path.resolve(rootDir);
 	console.log(`Absolute Route: ${absRoot}`);
-	return function staticMiddleware(req, res) {
+	return (req, res) => {
 		// Parseamos URL usando la clase URL para evitar sorpresas
-		const parsed = new URL(req.url, `http://${req.headers.host}`);
-		let pathname = decodeURIComponent(parsed.pathname);
+		let pathname = parseURL(req);
 
 		// Normalize + quitar "../" + eliminar slash inicial
-		let safe = path.normalize(pathname).replace(/^(\.\.(\/|\\))+/g, "");
-		safe = safe.replace(/^[/\\]+/, "");
-		const filePath = path.join(absRoot, safe);
+		const filePath = sanitizePath(pathname,absRoot);
 
 		// No salirse de absRoot
 		if (!filePath.startsWith(absRoot + path.sep)) {
@@ -28,6 +37,7 @@ function serveStatic(rootDir) {
 		if( !fs.existsSync(filePath) ){
 			return false;
 		}
+
 		const stats = fs.statSync(filePath);
 		if (!stats.isFile()) {
 			// NO enviamos respuesta aquí, delegamos al siguiente handler
@@ -146,18 +156,16 @@ export class Router {
 			}
 		}
 
-		// Buscar ruta coincidente
-		let matchedRoute = this.routes[method].find((route) => {
+		const routeFilter = (route) => {
 			const regex = this._pathToRegExp(route.path);
 			return regex.pattern.test(pathname);
-		});
+		};
+		// Buscar ruta coincidente
+		let matchedRoute = this.routes[method].find(routeFilter);
 
 		// Si no se encuentra en el method del request, revisar en la STATIC
 		if (!matchedRoute) {
-			matchedRoute = this.routes["STATIC"].find((route) => {
-				const regex = this._pathToRegExp(route.path);
-				return regex.pattern.test(pathname);
-			});
+			matchedRoute = this.routes["STATIC"].find(routeFilter);
 		}
 
 		if (matchedRoute) {

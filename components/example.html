@@ -34,4 +34,8 @@ p#count {
 		document.querySelector("slot[name='title']").innerHTML = nv;
 	})
 	
+	registerDynamicCallback("title", (nv) => {
+		console.log("Updating title: ", nv);
+	})
+
 </script>

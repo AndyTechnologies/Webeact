@@ -59,10 +59,10 @@ routing.get("/connect", (req, res) => {
 
 	// mandar un mensaje con los archivos detectados
 	sendEvent(getFilesNames());
-	// Y luego actualizar cada 2.5 segundos
+	// Y luego actualizar cada cierta cantidad de segundos
 	const intervalId = setInterval(() => {
 		sendEvent(getFilesNames());
-	}, COMPONENTS_REFRESH_TIME); // actualizar información cada 2.5 segundos
+	}, COMPONENTS_REFRESH_TIME); // actualizar información cada cierta cantidad de segundos
 
 	// When client closes connection, stop sending events
 	req.on("close", () => {
@@ -72,11 +72,12 @@ routing.get("/connect", (req, res) => {
 });
 
 function getFilesNames() {
-	return glob(path.join(CMPNAME, "*.*"))
-		.map((s) => s.split("/"))
-		.map((s) => s[s.length - 1])
-		.map((s) => s.split(".")[0])
-		.map((s) => s.toLowerCase());
+	return glob(
+		path.join(CMPNAME, "*.*"),
+		(s) => {
+			const ss = s.split("/");
+			return ss[ss.length - 1].split('.')[0].toLowerCase();
+		});
 }
 
 /*

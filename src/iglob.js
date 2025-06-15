@@ -33,9 +33,10 @@ export function globToRegExp(glob) {
  * Busca archivos recursivamente en el sistema de archivos que coincidan con un patrón glob.
  *
  * @param {string} pattern - El patrón glob a buscar.
+ * @param {function} transform - Función que se le aplica al array de resultados
  * @returns {string[]} Una lista de rutas de archivo que coinciden con el patrón.
  */
-export function globSync(pattern) {
+export function globSync(pattern, transform = (a) => a) {
 	const regex = globToRegExp(pattern);
 	const results = [];
 
@@ -52,7 +53,7 @@ export function globSync(pattern) {
 					regex.test(nextPath.replace(/\\/g, "/"))
 				) {
 					if (entry.isFile()) {
-						results.push(nextPath);
+						results.push(transform(nextPath));
 					}
 				}
 				if (entry.isDirectory()) {
