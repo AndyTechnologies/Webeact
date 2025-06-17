@@ -16,6 +16,7 @@ export class Element extends HTMLElement {
 
 		// Necesarios para el Context
 		this.Context = new Context(
+			this.tagName,
 			this._deferRender.bind(this),
 			this.hasAttribute.bind(this),
 			this.getAttribute.bind(this)
@@ -139,8 +140,12 @@ export class Element extends HTMLElement {
 	executeScript(scriptElement) {
 		// Agregar funciones globales al window
 		Object.entries(this.Context.callbacks).forEach(([name, func]) => {
-			if (typeof func === "function" || typeof func === "object")
+			if (typeof func === "function"){
 				window[name] = func;
+			}else if (typeof func === "object"){
+				window[name] = {};
+				Object.assign(window[name], func);
+			}
 		});
 		// Agregar contexto al window
 		window.ctx = this.Context;

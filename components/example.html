@@ -15,7 +15,7 @@ p#count {
 
 <script data-dynamic> // El data-dynamic es para que se re-ejecute en cada re-renderizado
 	const [count, setCount] = useState(0);
-	
+
 	useEffect((cvalue) => {
 		document.querySelector("#count").innerHTML = cvalue;
 	}, [count]);

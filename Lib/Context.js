@@ -1,7 +1,12 @@
-
+// Función para ignorar los callbacks
 function __ignoreCallback(){}
+
+
 export class Context {
-	constructor(renderCallback, hasAttr, getAttr) {
+	static idx = 0;
+	constructor(cmpName, renderCallback, hasAttr, getAttr) {
+		// Nombre para el Context (TODO: para poder guardar estados en el localStorage)
+		this._contextName = `webeact-ctx-${cmpName}-${Context.idx++}`;
 		// Callbacks para ejecutarse cuando se actualice el estado de un atributo
 		this.dynamicCallbacks = new Map();
 		// Almacena los estados por orden
@@ -89,30 +94,20 @@ export class Context {
 	// Hook para que una función se ejecute 1 vez (la primera vez)
 	// y después solo cuando cambien sus params
 	useEffect(callback, params) {
-		let areEquals = true; // Si los params son iguales o no
-
 		// 1. Obtener el índice actual y avanzar el contador
 		const currentIndex = this.hookIndex++;
+		const oldEffect = Array.from(this.effects[currentIndex] || []);
 
-		// 2. Verificar si el callback ya existe
-		if (!this.effects[currentIndex]) {
-			areEquals = false // se ejecutará porque no existe
-		} else {
-			// 3. Verificar si los params son iguales
-			const [, oldParams] = Array.from(this.effects[currentIndex]);
-			if (oldParams.length !== params.length) // longitudes distintas para evitar bucles
-				// 4. Si no son iguales, se ejecutará porque los params son diferentes
-				areEquals = false;
-			// 5. Sino verificar si los params son iguales uno a uno (mas costoso)
-			else for (let i = 0; i < oldParams.length; i++) {
-				if (!Object.is(oldParams[i], params[i])) {
-					areEquals = false; break; // Una vez un parametro ha cambiado, se vuelve a ejecutar
-				}
-			}
-		}
+		// 2. Si los params son iguales o no
+		let areEquals = (oldEffect[1] && oldEffect[1].length === params.length);
 
-		// Si los params son iguales, no se ejecutará
-		if (!areEquals) {
+		// 3. Verificar que todos los parámetros sean iguales.
+		const [, oldParams] = oldEffect;
+		for (let i = 0; (i < oldParams?.length) && areEquals; i++)
+			areEquals = Object.is(oldParams[i], params[i]);
+
+		// 4. Si hay diferencias de parámetros, se actualizan los callbacks
+		if(!areEquals){
 			this.effects[currentIndex] = [callback, params];
 			callback(...params);
 		}
