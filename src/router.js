@@ -1,6 +1,19 @@
 import url from "url";
 import path from "path";
-import * as fs from "fs";
+import { promises as fs, createReadStream } from "fs";;
+
+// Mapa de tipos MIME reutilizable
+const mimeTypes = {
+	".html": "text/html; charset=utf-8",
+	".js": "application/javascript; charset=utf-8",
+	".css": "text/css; charset=utf-8",
+	".json": "application/json; charset=utf-8",
+	".png": "image/png",
+	".jpg": "image/jpeg",
+	".gif": "image/gif",
+	".txt": "text/plain; charset=utf-8",
+	".ico": "image/x-icon",
+};
 
 // =======================
 // 1. Middleware para servir archivos estáticos
@@ -20,59 +33,100 @@ function sanitizePath(pathname, absRoot){
 function serveStatic(rootDir) {
 	// Asegurarnos de tener la ruta absoluta de la raíz
 	const absRoot = path.resolve(rootDir);
-	console.log(`Absolute Route: ${absRoot}`);
-	return (req, res) => {
-		// Parseamos URL usando la clase URL para evitar sorpresas
-		let pathname = parseURL(req);
 
-		// Normalize + quitar "../" + eliminar slash inicial
-		const filePath = sanitizePath(pathname,absRoot);
+	return async (req, res) => {
+		try {
+			const pathname = path.resolve(parseURL(req));
+			const filePath = path.resolve(sanitizePath(pathname, absRoot));
 
-		// No salirse de absRoot
-		if (!filePath.startsWith(absRoot + path.sep)) {
-			console.error("Forbidden on request");
-			return false;
-		}
-
-		if( !fs.existsSync(filePath) ){
-			return false;
-		}
-
-		const stats = fs.statSync(filePath);
-		if (!stats.isFile()) {
-			// NO enviamos respuesta aquí, delegamos al siguiente handler
-			console.error("Resource is not a file!");
-			return false;
-		}
-
-		// MIME types
-		const ext = path.extname(filePath).toLowerCase();
-		const mimeTypes = {
-			".html": "text/html; charset=utf-8",
-			".js": "application/javascript; charset=utf-8",
-			".css": "text/css; charset=utf-8",
-			".json": "application/json; charset=utf-8",
-			".png": "image/png",
-			".jpg": "image/jpeg",
-			".gif": "image/gif",
-			".txt": "text/plain; charset=utf-8",
-			".ico": "image/x-icon",
-		};
-		const contentType = mimeTypes[ext] || "application/octet-stream";
-
-		// Stream del archivo
-		res.writeHead(200, { "Content-Type": contentType });
-		const stream = fs.createReadStream(filePath);
-		stream.on("error", (streamErr) => {
-			console.error("Stream error:", streamErr);
-			if (!res.headersSent) {
-				res.writeHead(500, { "Content-Type": "text/plain" });
+			if (!filePath.startsWith(absRoot + path.sep)) {
+				console.warn("[403] Forbidden path: " + filePath);
+				return false;
 			}
-			return res.end("Internal Server Error");
-		});
-		stream.pipe(res);
 
-		return true;
+			let stats;
+			try {
+				stats = await fs.stat(filePath);
+			} catch (err) {
+				if (err.code === "ENOENT") return false;
+				throw err;
+			}
+
+			if (!stats.isFile()) {
+				console.warn("[400] Not a file: " + filePath);
+				return false;
+			}
+
+			const ext = path.extname(filePath).toLowerCase();
+			const contentType = mimeTypes[ext] || "application/octet-stream";
+
+			// Headers optimizados con cache y tamaño
+			const headers = {
+				'Content-Type': contentType,
+				'Content-Length': stats.size,
+				'Last-Modified': stats.mtime.toUTCString(),
+				'Cache-Control': 'public, max-age=3600', // Cache por 1 hora
+				'ETag': `"${stats.mtime.getTime()}-${stats.size}"` // ETag simple basado en mtime y tamaño
+			};
+
+			const ifNoneMatch = req.headers['if-none-match'];
+			if (ifNoneMatch && ifNoneMatch === headers.ETag) {
+				res.writeHead(304, { 'ETag': headers.ETag });
+				res.end();
+				return true;
+			}
+
+			// Verificar If-Modified-Since
+			const ifModifiedSince = req.headers['if-modified-since'];
+			if (ifModifiedSince && new Date(ifModifiedSince) >= stats.mtime) {
+				res.writeHead(304, {
+					'Last-Modified': headers['Last-Modified'],
+					'ETag': headers.ETag
+				});
+				res.end();
+				return true;
+			}
+
+			// Configurar headers de respuesta
+			res.writeHead(200, headers);
+
+			// Stream del archivo con manejo de errores mejorado
+			const stream = createReadStream(filePath);
+
+			stream.on("error", (streamErr) => {
+				console.error('Stream error:', streamErr);
+
+				// Solo enviar respuesta de error si no se han enviado headers
+				if (!res.headersSent) {
+					res.writeHead(500, { 'Content-Type': 'text/plain' });
+					res.end('Internal Server Error');
+				} else {
+					// Si ya se enviaron headers, solo cerrar la conexión
+					res.destroy();
+				}
+			});
+
+			// Manejar cuando el cliente cierra la conexión
+			req.on('close', () => {
+				if (!stream.destroyed) {
+					stream.destroy();
+				}
+			});
+
+			// Pipe del stream al response
+			stream.pipe(res);
+
+			return true;
+		} catch (error) {
+			console.error('Error serving static file:', error);
+
+			if (!res.headersSent) {
+				res.writeHead(500, { 'Content-Type': 'text/plain' });
+				res.end('Internal Server Error');
+			}
+
+			return false;
+		}
 	};
 }
 
@@ -136,12 +190,13 @@ export class Router {
 	get_static(pathname){
 		return serveStatic(pathname);
 	}
+
 	use_static(pathname){
 		this.use(this.get_static(pathname))
 	}
 
 	// Middleware que ejecuta las rutas
-	middleware(req, res) {
+	async middleware(req, res) {
 		const parsedUrl = url.parse(req.url, true);
 		const { pathname } = parsedUrl;
 		const method = req.method;
@@ -150,7 +205,7 @@ export class Router {
 		// Execute all middlewares
 		for (let idx = 0; idx < this.middlewares.length; idx++) {
 			const clbk = this.middlewares[idx];
-			const result = clbk(req, res, () => {});
+			const result = await clbk(req, res, () => {});
 			if (result) {
 				break;
 			}
@@ -185,7 +240,7 @@ export class Router {
 	_pathToRegExp(path) {
 		const keys = [];
 		const pattern = path
-			.replace(/\/:([^\/]+)/g, (_, key) => {
+			.replace(/\/:([^/]+)/g, (_, key) => {
 				keys.push(key);
 				return "/([^/]+)";
 			})
