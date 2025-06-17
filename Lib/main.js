@@ -12,14 +12,14 @@ function useEventSource(url, onMessage, onError, events = {}) {
 
 function event_update({ data }) {
 	const files = JSON.parse(data);
-	files.forEach((file) => {
-		if (customElements.get(`web-${file}`)) return;
-		console.log(`Cargando ${file} como web-${file}...`);
+	files.forEach(({filePath, content}) => {
+		if (customElements.get(`web-${filePath}`)) return;
+		console.log(`Cargando ${filePath} como web-${filePath}...`);
 		customElements.define(
-			`web-${file}`,
+			`web-${filePath}`,
 			class extends Element {
 				constructor() {
-					super(`/webeact/component/${file}`);
+					super(content);
 				}
 			}
 		); // define
@@ -27,15 +27,24 @@ function event_update({ data }) {
 }
 
 window.addEventListener("load", () => {
+	let time;
 	useEventSource(
 		"/webeact/connect",
 		({ data }) => {
-			console.log("Conexión establecida:", data);
+			time = Date.now();
+			console.log("Conexión establecida:", data, `-${time}`);
 		},
 		(event) => {
 			console.log("Error en la conexión:", event);
 		},
 		// Custom Events
-		{ update: event_update }
+		{
+			update: (...args) => {
+				const local = Date.now();
+				console.log(`Init Update Call: ${local - time}`);
+				event_update(...args);
+				console.log(`End Update Call: ${Date.now() - local}`);
+			}
+		}
 	);
 });

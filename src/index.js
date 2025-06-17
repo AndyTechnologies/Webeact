@@ -1,50 +1,32 @@
 import glob from "./iglob.js";
 import router from "./router.js";
-import templateEngine from "./ssr.js";
+import cacheEngine from "./view-cache.js";
 import path from "path";
 const routing = router();
 
-const CMPNAME =
-	process.env.COMPONENTS_DIRECTORY || path.join(process.cwd(), "components");
-const LIBNAME =
-	process.env.LIB_DIRECTORY || path.join(process.cwd(), "Lib");
-const COMPONENTS_REFRESH_TIME = process.env.COMPONENTS_REFRESH_TIME || (2.5 * 1000); // 2.5 segundos
+function _loadEnv(envKey, elseName){
+	return _envOr(envKey, path.join(process.cwd(), elseName));
+}
 
-const renderMiddleware = templateEngine({
-	viewsDirectory: CMPNAME,
-	cacheSize: 25,
-	isProduction: process.env.NODE_ENV === "production",
-	streaming: true,
-	// Context functions avaiables for SSR
-	helpers: {
-		getFilesNames,
-		getEnv: () => {
-			return {
-				CMPNAME, LIBNAME, COMPONENTS_REFRESH_TIME, ...process.env
-			}
-		},
-		glob,
-		path,
-		thisRouter: routing,
-		createRouter: router
-	}
-});
+function _envOr(envKey, elseValue){
+	return process.env[envKey] || elseValue;
+}
+
+const CMPNAME = _loadEnv("COMPONENTS_DIRECTORY", "components");
+const LIBNAME = _loadEnv("LIB_DIRECTORY", "Lib");
+const CMPS_REFRESH = _envOr("CMPS_REFRESH", (2.5 * 1000)); // 2.5 segundos
+const PRODUCTION = true;
 
 // Servir todos los scripts del lib
 routing.use_static(LIBNAME);
-routing.use(renderMiddleware);
+routing.use(cacheEngine({
+	viewsDirectory: CMPNAME,
+	cacheSize: 25,
+	isProduction: PRODUCTION || process.env.NODE_ENV === "production",
+	streaming: true
+}));
 
-routing.get("/component/:name", (req, res) => {
-	const componentName = req.params.name;
-	const attrs = {componentName, ...req.query};
-	res.renderComponent(`${componentName}.html`, attrs);
-});
-
-routing.get("/files", (_req, res) => {
-	res.end(getFilesNames());
-});
-
-routing.get("/connect", (req, res) => {
+routing.get("/connect", async (req, res) => {
 	// Cabeceras necesarias para el SSE
 	res.setHeader("Content-Type", "text/event-stream");
 	res.setHeader("Cache-Control", "no-cache");
@@ -52,17 +34,28 @@ routing.get("/connect", (req, res) => {
 
 	// Mandar un mensaje inicial al cliente
 	res.write(`data: Webeact SSE\n\n`);
-	const sendEvent = (data) => {
+	const sendEvent = async (data) => {
+		let data2send = [];
+		for (const filePath of Array.from(data)){
+			data2send.push({
+				filePath,
+				content: await res.webeactViewContent(`${filePath}.html`)
+			});
+		}
 		res.write(`event: update\n`);
-		res.write(`data: ${JSON.stringify(data)}\n\n`);
+		res.write(`data: ${JSON.stringify(data2send)}\n\n`);
 	};
-
 	// mandar un mensaje con los archivos detectados
-	sendEvent(getFilesNames());
+	let data = getFilesNames();
+	sendEvent(data);
 	// Y luego actualizar cada cierta cantidad de segundos
 	const intervalId = setInterval(() => {
-		sendEvent(getFilesNames());
-	}, COMPONENTS_REFRESH_TIME); // actualizar información cada cierta cantidad de segundos
+		const newDatas = getFilesNames();
+		if( !areEquals(data, newDatas) ){
+			sendEvent(diffArray(newDatas, data));
+			data = newDatas;
+		}
+	}, CMPS_REFRESH); // actualizar información cada cierta cantidad de segundos
 
 	// When client closes connection, stop sending events
 	req.on("close", () => {
@@ -78,6 +71,35 @@ function getFilesNames() {
 			const ss = s.split("/");
 			return ss[ss.length - 1].split('.')[0].toLowerCase();
 		});
+}
+
+
+/**
+ * Retorna los elementos de diferencia entre el arr1 y el arr2
+ * @param {Array} arr1 Array a la izquierda de la comparación
+ * @param {Array} arr2 Array a la derecha de la comparación
+ * @returns {Array} Elementos que están en el arr1 y no en el arr2
+ */
+function diffArray(arr1, arr2){
+	return arr1.filter(v => {return !arr2.includes(v)});
+}
+
+/**
+ * Verifica que dos arrays sean iguales o no
+ * @param {Array} arr1 Array a la izquierda de la comparación
+ * @param {Array} arr2 Array a la derecha de la comparación
+ */
+function areEquals(arr1, arr2){
+	// Si son la misma referencia, retorna true
+	if( arr1 === arr2 ) return true;
+	// Si sus longitudes son iguales
+	if( arr1.length === arr2.length )
+		// Por cada elemento del arr1
+		for(const a of arr1){
+			// Verificar que existe en arr2
+			if(!arr2.includes(a)) return false;
+		}
+	return true;
 }
 
 /*

@@ -6,7 +6,7 @@ export class Element extends HTMLElement {
 
 	constructor(source) {
 		super();
-		this.templateSrc = source; // URL del template
+		this.templateSrc = source; // Contenido del componente
 		this.shadow = this.attachShadow({ mode: "open" }); // Crear un ShadowDOM
 
 		// Estados internos
@@ -104,8 +104,7 @@ export class Element extends HTMLElement {
 	async render() {
 		try {
 			// Cargar template
-			const response = await fetch(this.templateSrc);
-			const html = await response.text();
+			const html = this.templateSrc;
 			// Crear template y clonar contenido
 			this.template = document.createElement("template");
 			this.template.innerHTML = html;
