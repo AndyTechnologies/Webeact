@@ -7,7 +7,6 @@
  */
 import { promises as fs, statSync } from 'fs';
 import path from 'path';
-import { Transform } from 'stream';
 import { LRUCache } from './lru.js';
 
 const PATTERNS = {
