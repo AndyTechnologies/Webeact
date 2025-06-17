@@ -1,6 +1,6 @@
 {
   "name": "webeact",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Una librería para construir interfaces reactivas con web components, inspirada en los hooks de React/Preact y en las template de Astro. Optimizada para integración con servidores",
   "main": "src/index.js",
   "type": "module",
