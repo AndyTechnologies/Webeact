@@ -19,7 +19,7 @@ p#count {
 	const [getCount, writeCount] = useLocalStorage("counter", 0);
 
     // Utiliza hooks de react como siempre!
-	const [count, setCount] = useState(0);
+	const [count, setCount] = useState(0, "counter");
 
     // Misma API
 	useEffect((cvalue) => {

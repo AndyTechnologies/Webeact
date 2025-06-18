@@ -30,8 +30,8 @@ importers:
         specifier: 5.1.0
         version: 5.1.0
       webeact:
-        specifier: file:../../webeact-0.2.5.tgz
-        version: file:webeact-0.2.5.tgz
+        specifier: file:../../webeact-0.2.7.tgz
+        version: file:webeact-0.2.7.tgz
 
 packages:
 
@@ -649,9 +649,9 @@ packages:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
 
-  webeact@file:webeact-0.2.5.tgz:
-    resolution: {integrity: sha512-56eavU4Bx5UvPv0/C5t8fzlsm/Tmq22WxZPsEqb7Hdvf40hNPdqiEcwaQJknm3jAv5M4t4uDJabQI4MlfQ2h3g==, tarball: file:webeact-0.2.5.tgz}
-    version: 0.2.5
+  webeact@file:webeact-0.2.7.tgz:
+    resolution: {integrity: sha512-hDbiZl+t+mK0VfXbWxw+fFVK6H1yvhUKaoFGyqUtW0FgiyMq+hEV7vKsDRjq+UsFxunJ+Z6g2HA3kqpY1rqS5w==, tarball: file:webeact-0.2.7.tgz}
+    version: 0.2.7
     engines: {node: '>= 23.0.0'}
 
   which@2.0.2:
@@ -1316,7 +1316,7 @@ snapshots:
 
   vary@1.1.2: {}
 
-  webeact@file:webeact-0.2.5.tgz: {}
+  webeact@file:webeact-0.2.7.tgz: {}
 
   which@2.0.2:
     dependencies:
