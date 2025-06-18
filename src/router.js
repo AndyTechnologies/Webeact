@@ -151,7 +151,7 @@ function serveStatic(rootDir) {
  * clase Router
  * contiene la lógica de routing del lado del servidor.
  */
-export class Router {
+class Router {
 	constructor() {
 		this.routes = {
 			GET: [],
@@ -343,6 +343,6 @@ export class Router {
  * Helper para crear un objeto Router
  * @returns nueva instancia del router
  */
-export default function router() {
+export function router() {
 	return new Router();
 }
