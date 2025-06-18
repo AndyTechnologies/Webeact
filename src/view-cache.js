@@ -45,43 +45,6 @@ const PATTERNS = {
 		// Manifest files
 		/<link[^>]+rel=["']manifest["'][^>]+href=["']([^"']+)["']/gi,
 	],
-	cssPatterns: [
-		// @import statements
-		/@import\s+(?:url\()?["']([^"']+)["'](?:\))?/gi,
-
-		// Background images
-		/background-image:\s*url\(["']?([^"')]+)["']?\)/gi,
-		/background:\s*[^;]*url\(["']?([^"')]+)["']?\)/gi,
-
-		// Font faces
-		/@font-face[^}]*src:\s*[^;]*url\(["']?([^"')]+)["']?\)/gi,
-
-		// Content property (for pseudo-elements with images)
-		/content:\s*url\(["']?([^"')]+)["']?\)/gi,
-
-		// CSS custom properties with URLs
-		/--[^:]+:\s*url\(["']?([^"')]+)["']?\)/gi,
-	],
-	jsPatterns: [
-		// ES6 imports
-		/import\s+(?:[^"']*from\s+)?["']([^"']+)["']/gi,
-
-		// CommonJS require
-		/require\s*\(\s*["']([^"']+)["']\s*\)/gi,
-
-		// Dynamic imports
-		/import\s*\(\s*["']([^"']+)["']\s*\)/gi,
-
-		// Fetch/XMLHttpRequest URLs (basic detection)
-		/fetch\s*\(\s*["']([^"']+)["']/gi,
-		/\.open\s*\(\s*["'][^"']*["']\s*,\s*["']([^"']+)["']/gi,
-
-		// Image creation
-		/\.src\s*=\s*["']([^"']+\.(jpg|jpeg|png|gif|svg|webp)[^"']*)["']/gi,
-
-		// Audio/Video sources
-		/\.src\s*=\s*["']([^"']+\.(mp3|wav|ogg|mp4|webm|avi)[^"']*)["']/gi,
-	]
 }
 
 
@@ -90,23 +53,23 @@ const PATTERNS = {
  * @property {string} [viewsDirectory='./views'] - Directory for view files
  * @property {number} [cacheSize=100] - Maximum number of files to cache (LRU)
  * @property {boolean} [isProduction=false] - Production mode flag (enables caching)
- * @property {boolean} [streaming=false] - Enable streaming for large responses
- * @property {number} [streamingThreshold=8192] - Minimum size in bytes to trigger streaming
  * @property {boolean} [prefetchDependencies=true] - Enable automatic dependency pre-fetching
  * @property {number} [prefetchDepth=2] - Maximum depth for dependency scanning
- * @property {string[]} [watchExtensions=['.html', '.htm']] - File extensions to watch for dependencies
  */
 
+/**
+ * Crea un middleware que inyecta todas las peticiones entrantes con las funciones
+ * de caching
+ * @param {CacheEngineOptions} options Objeto con opciones para crear el middleware de cache
+ * @returns middleware que inyectará en todas las peticiones las funciones de caché
+ */
 export function cacheEngine(options = {}) {
 	const config = {
 		viewsDirectory: path.resolve(options.viewsDirectory || './views'),
 		cacheSize: options.cacheSize || 100,
 		isProduction: options.isProduction ?? process.env.NODE_ENV === 'production',
-		streaming: options.streaming || true,
-		streamingThreshold: options.streamingThreshold || 8192, // 8KB
 		prefetchDependencies: options.prefetchDependencies !== false,
 		prefetchDepth: options.prefetchDepth || 2,
-		watchExtensions: options.watchExtensions || ['.html', '.htm'],
 	};
 
 	// Cache structures
@@ -115,27 +78,18 @@ export function cacheEngine(options = {}) {
 	const reverseGraph = new Map();    // dependencyPath -> Set<parentPaths>
 
 	/**
-   * Extract all types of dependencies from content
-   * Scans for HTML includes, CSS, JS, images, fonts, and other assets
-   * @param {string} content - Content to scan (HTML, CSS, JS)
-   * @param {string} basePath - Base path for resolving relative paths
-   * @param {string} fileExtension - Extension of the source file
-   * @returns {Set<string>} Set of dependency file paths
+   * Extrae todas las dependencias desde el contenido
+   * @param {string} content - Contenido a escanear
+   * @param {string} basePath - Directorio base desde el que se resuelven las rutas relativas
+   * @returns {Set<string>} Set de los nombres de archivos de los que depende el content
    */
-	function extractDependencies(content, basePath, fileExtension = '.html') {
+	function extractDependencies(content, basePath) {
 		const dependencies = new Set();
 
 		// dependency patterns
-		const { htmlPatterns, cssPatterns, jsPatterns } = PATTERNS;
+		const { htmlPatterns } = PATTERNS;
 
 		let patternsToUse = htmlPatterns;
-
-		// Select patterns based on file type
-		if (fileExtension === '.css') {
-			patternsToUse = cssPatterns;
-		} else if (['.js', '.mjs'].includes(fileExtension)) {
-			patternsToUse = jsPatterns;
-		}
 
 		// Extraer dependencias en función de los regexs
 		patternsToUse.forEach(pattern => {
@@ -385,9 +339,12 @@ export function cacheEngine(options = {}) {
 	}
 
 	/**
-   * Cache Engine Middleware
-   * Agrega la función renderComponent para opciones avanzadas de caching
-   */
+	 * El middleware que será el responsable de inyectar las funciones de caching
+	 * @param {Request} req Información de la petición web
+	 * @param {Response} res Información de la respuesta
+	 * @param {Function} next Siguiente handler a llamar
+	 * @returns {null} retorna null o lo que retorne el next callback en caso de ya estar instalado
+	 */
 	function cacheEngineMiddleware(req, res, next) {
 		// Prevenir multiples llamadas al middleware
 		if (res.webeactViewContent) {
