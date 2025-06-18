@@ -39,7 +39,8 @@ export class Context {
 			useState: this.useState.bind(this),
 			useEffect: this.useEffect.bind(this),
 			useViewTransition: this.useViewTransition.bind(this),
-			useSSE: this.useSSE.bind(this)
+			useSSE: this.useSSE.bind(this),
+			useLocalStorage: this.useLocalStorage.bind(this)
 		};
 		// Callback para actualizar el DOM
 		this._render = renderCallback;
@@ -165,11 +166,17 @@ export class Context {
 	 * Hook para tener un estado reactivo que cuando cambie
 	 * desencadenará un re-renderizado
 	 * @param {*} initialValue Valor inicial para el estado
+	 * @param {string} storageKey Key opcional para asociar el estado a un valor del localStorage
 	 * @returns {Array} primer valor del array es el valor actual del estado, y el segundo es la función que se usa para actualizar el valor del estado y desencadenar el re-renderizado
 	 */
-	useState(initialValue) {
+	useState(initialValue, storageKey) {
 		// 1. Obtener el índice actual y avanzar el contador
 		const currentIndex = this.hookIndex++;
+		let getter = null, setter = null;
+		if (storageKey !== undefined){
+			[getter, setter] = this.useLocalStorage(storageKey, initialValue);
+			initialValue = getter();
+		}
 
 		// 2. Inicializar el estado si no está definido
 		if (this.states[currentIndex] === undefined) {
@@ -189,7 +196,7 @@ export class Context {
 			if (!Object.is(oldState, value)) {
 				// 6. Actualizar estado
 				this.states[currentIndex] = value;
-
+				if(setter) setter(value);
 				// 7. Programar re-renderizado
 				if (this._render) this._render();
 			}
@@ -197,4 +204,78 @@ export class Context {
 
 		return [this.states[currentIndex], setState];
 	}
+
+	/**
+	 * useLocalStorage
+	 * Proporciona acceso de lectura y escritura a localStorage sin dependencias.
+	 * @param {string} key - Clave en localStorage.
+	 * @param {*} initialValue - Valor inicial si no existe en localStorage.
+	 * @returns {[function(): any, function(*|function): void]} - Array con [read, write].
+	 */
+	useLocalStorage(key, initialValue) {
+
+		/**
+		 * Cargar los datos del contexto o crear un objeto vacío
+		 * @returns los datos del contexto
+		 */
+		const loadData = () => {
+			let data = window.localStorage.getItem(this._contextName);
+			if (data === null) {
+				data = {};
+				window.localStorage.setItem(this._contextName, JSON.stringify(data));
+			} else {
+				data = JSON.parse(data);
+			}
+			return data;
+		}
+
+		// Inicializar valor en localStorage si no existe
+		try {
+			const data = loadData();
+
+			if (!data[key] && initialValue !== undefined )
+			{ data[key] = initialValue }
+			window.localStorage.setItem(this._contextName, JSON.stringify(data));
+		} catch (err) {
+			console.warn(`useLocalStorage: no se pudo inicializar la clave "${key}":`, err);
+		}
+
+		/**
+		 * Leer valor de localStorage.
+		 * @returns {*} Valor parseado o null.
+		 */
+		const read = () => {
+			try {
+				const data = loadData();
+				let item = null;
+				if( data[key] !== undefined )
+					item = data[key];
+				return item;
+			} catch (err) {
+				console.warn(`useLocalStorage: error al leer la clave "${key}":`, err);
+				return null;
+			}
+		}
+
+		/**
+		 * Escribir valor en localStorage.
+		 * @param {*|function} value - Valor directo o función que recibe el previo y retorna el nuevo.
+		 */
+		const write = (value) => {
+			try {
+				const current = read();
+				const valueToStore = value instanceof Function ? value(current) : value;
+
+				const data = loadData();
+				data[key] = valueToStore;
+				window.localStorage.setItem(this._contextName, JSON.stringify(data));
+			} catch (err) {
+				console.warn(`useLocalStorage: error al escribir la clave "${key}":`, err);
+			}
+		}
+
+		return [read, write];
+	}
+
+
 }
