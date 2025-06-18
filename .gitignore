@@ -1,5 +1,7 @@
 #My Rules
 min/
+./pnpm-lock.yaml
+
 # Logs
 logs
 *.log
