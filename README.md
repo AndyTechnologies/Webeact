@@ -33,11 +33,70 @@ npm install webeact
 
 ---
 
+## Hooks
+
+- **useState:** 
+	> Crea un estado reactivo, y cada vez que cambia se re-renderiza el componente
+	```js
+	const [count, setCount] = useState(0);
+	setCount(1); // re-render
+	setCount(v => v+1); // re-render!
+	console.log(count); // output: 2 
+	```
+- **useLocalStorage:**
+	> Maneja el local storage en el scope específico de tu componente
+	```js
+	const [get,set] = useLocalStorage("contador",0);
+	set(1); // no re-renderiza!
+	set(v => v+1); // tampoco re-renderiza
+	// Obtiene el valor actual desde el localStorage
+	console.log(get()); // output: 2
+	```
+- **useState & useLocalStorage:**
+	> Combina la gestión de estados, con la persistencia en el local storage
+	```js
+	const [count, setCount] = useState(0, "counter"); // "counter" = localStorage key
+	setCount(1); // Si re-renderiza
+	setCount(v => v+1) // También re-renderiza
+	// Valor actualizado del estado!
+	console.log(count); // output: 2
+	```
+- **useEffect:**
+	> Haz que una función se re-ejecute cada vez que cambien sus dependencias
+	```js
+	useEffect((nuevo_count) => {
+		...
+	}, [count])
+	```
+- **useViewTransition:**
+	> Envuelve cualquier función que cambie la UI para hacer una transición. [Más información sobre cómo funcionan las ViewTransitions](https://developer.mozilla.org/en-US/docs/Web/API/View_Transition_API)
+	```js
+	useViewTransition(() => {
+		... cambios en la UI
+	})
+	```
+- **useSSE:**
+	> Suscríbete a los servidores que soporten este protocolo para recibir actualizaciones periódicamente. [Más información acerca de los SSE](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)
+	```js
+	useSSE(
+		"https://host...",
+		(ev) => console.log("Evento anónimo"),
+		(ev) => console.error("Error en SSE"),
+		{
+			custom_event: (ev) => {
+				console.log("Custom events!")
+			}
+		}
+	)
+	```
+
+---
+
 ## ℹ️ Cómo se usa?
 
-En tu proyecto debe haber una carpeta `components` (la carpeta por defectos donde se buscarán los componentes, modificable por la variable de entorno COMPONENTS_DIRECTORY), luego en tu servidor utiliza el middleware:
+En tu proyecto debe haber una carpeta `components` (la carpeta por defectos donde se buscarán los componentes, modificable en las opciones del middleware), luego en tu servidor utiliza el middleware:
 ```js
-import webeact from '../src/index.js';
+import webeact from 'webeact';
 
 // ... inicializar tu aplicación con express
 
@@ -70,6 +129,9 @@ p#count {
 <script data-dynamic>
     // El data-dynamic es para que se re-ejecute en cada re-renderizado
 
+	// Ahora disponible la API del LocalStorage
+	const [getCount, writeCount] = useLocalStorage("counter", 0);
+
     // Utiliza hooks de react como siempre!
 	const [count, setCount] = useState(0);
 
@@ -80,11 +142,13 @@ p#count {
 	
     // Junto a la API del DOM
 	document.querySelector("#counter-plus").addEventListener("click", () => {
+		writeCount(v => v + 1);
  		setCount(v => v + 1); // No tiene ViewTransition en los cambios
 	});
 	
 	document.querySelector("#counter-minus").addEventListener("click", () => {
         // Y mucho más
+		writeCount(v => v - 1);
 		useViewTransition(() => setCount(v => (v <= 0) ? 0 : v - 1));
 	});
 	
