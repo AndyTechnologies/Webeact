@@ -1,4 +1,4 @@
-import * as fs from "fs";
+import {promises as fs, readdirSync} from "fs";
 import path from "path";
 
 /**
@@ -33,6 +33,47 @@ export function globToRegExp(glob) {
  * Busca archivos recursivamente en el sistema de archivos que coincidan con un patrón glob.
  *
  * @param {string} pattern - El patrón glob a buscar.
+ * @param {function} [transform=(a) => a] - Función que se le aplica a cada ruta de archivo antes de agregarla al resultado.
+ * @returns {Promise<string[]>} Una lista de rutas de archivo que coinciden con el patrón.
+ */
+export async function globAsync(pattern, transform = (a) => a) {
+	const regex = globToRegExp(pattern);
+	const results = [];
+
+	async function traverse(currentPath) {
+		try {
+			const entries = await fs.readdir(currentPath, { withFileTypes: true });
+			for (const entry of entries) {
+				const nextPath = path.join(currentPath, entry.name);
+				const relativePath = path.relative(process.cwd(), nextPath)
+					.replace(/\\/g, "/");
+
+				if (
+					regex.test(relativePath) ||
+					regex.test(nextPath.replace(/\\/g, "/"))
+				) {
+					if (entry.isFile()) {
+						results.push(transform(nextPath));
+					}
+				}
+
+				if (entry.isDirectory()) {
+					await traverse(nextPath);
+				}
+			}
+		} catch (err) {
+			console.error("Catched error:", err);
+		}
+	}
+
+	await traverse(process.cwd());
+	return results;
+}
+
+/**
+ * Busca archivos recursivamente en el sistema de archivos que coincidan con un patrón glob.
+ *
+ * @param {string} pattern - El patrón glob a buscar.
  * @param {function} transform - Función que se le aplica al array de resultados
  * @returns {string[]} Una lista de rutas de archivo que coinciden con el patrón.
  */
@@ -42,7 +83,7 @@ export function globSync(pattern, transform = (a) => a) {
 
 	function traverse(currentPath) {
 		try {
-			const entries = fs.readdirSync(currentPath, { withFileTypes: true });
+			const entries = readdirSync(currentPath, { withFileTypes: true });
 			for (const entry of entries) {
 				const nextPath = path.join(currentPath, entry.name);
 				const relativePath = path
@@ -69,4 +110,11 @@ export function globSync(pattern, transform = (a) => a) {
 	return results;
 }
 
-export default globSync;
+export const glob = globAsync;
+
+export default {
+	glob,
+	globToRegExp,
+	globSync,
+	globAsync
+};
