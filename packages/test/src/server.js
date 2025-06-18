@@ -1,10 +1,10 @@
 import express from 'express';
-import webeact from '../src/index.js';
+import webeact from 'webeact';
 import path from 'path';
 
 const app = express();
 const PORT = 3000;
-const EXAMPLE_DIR = path.join(process.cwd(), 'example');
+const EXAMPLE_DIR = path.join(process.cwd(), 'public');
 
 app.use("/webeact", webeact({logRequest: true}))
 

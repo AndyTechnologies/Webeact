@@ -1,7 +1,6 @@
 .*
 .github
-example
-components
+packages/*
 node_modules
 *.tgz
 dist

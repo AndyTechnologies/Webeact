@@ -1,4 +1,4 @@
-<slot name="title">Ejemplo de Contador</slot>
+<h1><slot name="title">Ejemplo de Contador</slot></h1>
 <p id="count" name="count"></p>
 <button id="counter-plus">+</button>
 <button id="counter-minus"> - </button>
@@ -12,29 +12,30 @@ p#count {
 }
 </style>
 
-<script data-dynamic> // El data-dynamic es para que se re-ejecute en cada re-renderizado
+<script data-dynamic>
+    // El data-dynamic es para que se re-ejecute en cada re-renderizado
+
+    // Utiliza hooks de react como siempre!
 	const [count, setCount] = useState(0);
 
+    // Misma API
 	useEffect((cvalue) => {
 		document.querySelector("#count").innerHTML = cvalue;
 	}, [count]);
 	
+    // Junto a la API del DOM
 	document.querySelector("#counter-plus").addEventListener("click", () => {
  		setCount(v => v + 1); // No tiene ViewTransition en los cambios
 	});
 	
 	document.querySelector("#counter-minus").addEventListener("click", () => {
-	 	// Los cambios se hacen con ViewTransition
+        // Y mucho más
 		useViewTransition(() => setCount(v => (v <= 0) ? 0 : v - 1));
 	});
 	
-	// Cada que cambie el atributo title, se actualiza el slot
+	// Contenido dinámico
 	registerDynamicCallback("title", (nv) => {
 		document.querySelector("slot[name='title']").innerHTML = nv;
-	})
-	
-	registerDynamicCallback("title", (nv) => {
-		console.log("Updating title: ", nv);
 	})
 
 </script>

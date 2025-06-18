@@ -6,11 +6,10 @@
   "type": "module",
   "sideEffects": false,
   "scripts": {
-    "start": "node --watch example/server.js",
-    "dev": "pnpm run lint && node --watch-path=example --watch-path=Lib --watch-path=src  --watch example/server.js",
-    "prepublishOnly": "rm -rf dist && pnpm run lint && pnpm run minify",
-    "lint": "eslint --fix .",
-    "minify": "minify-js src dist && minify-js Lib ../dist"
+    "start": "node --run dev",
+    "dev": "pnpm pack && pnpm -r dev",
+    "prepack": "node --run lint",
+    "lint": "eslint --fix ."
   },
   "keywords": [
     "web-components",
@@ -30,13 +29,10 @@
   "homepage": "https://github.com/AndyTechnologies/Webeact#readme",
   "packageManager": "pnpm@10.12.1",
   "devDependencies": {
-    "@adamlui/minify.js": "1.8.6",
-    "@eslint/css": "^0.9.0",
-    "@eslint/js": "^9.29.0",
-    "@eslint/json": "^0.12.0",
-    "@eslint/markdown": "^6.5.0",
+    "@eslint/css": "0.9.0",
+    "@eslint/js": "9.29.0",
+    "@eslint/json": "0.12.0",
     "eslint": "9.28.0",
-    "express": "5.1.0",
     "globals": "16.2.0"
   },
   "engines": {
