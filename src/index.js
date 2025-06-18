@@ -1,9 +1,9 @@
-import glob from "./iglob.js";
+import { glob } from "./iglob.js";
 import { diffArray, areEquals } from "./array_utils.js";
-import cacheEngine from "./view-cache.js";
-import path from "path";
+import { cacheEngine } from "./view-cache.js";
+import { router } from "./router.js";
 
-import router from "./router.js";
+import path from "path";
 const routing = router();
 
 /**
@@ -76,19 +76,20 @@ async function handleSSE(req,res) {
 	};
 
 	// mandar un mensaje con los archivos detectados
-	let data = getFilesNames(); // cacheamos los archivos ya enviados
+	let data = await getFilesNames(); // cacheamos los archivos ya enviados
 	sendEvent(data);
 
 	// Y luego actualizar cada cierta cantidad de segundos
 	const intervalId = setInterval(() => {
-		let newDatas = getFilesNames();
-		// Verificar que hayan nuevos componentes
-		if (!areEquals(data, newDatas)) {
-			// Y enviar solo la diferencia
-			newDatas = diffArray(newDatas, data);
-			sendEvent(newDatas);
-			data.push(...newDatas); // actualizar la lista de los componentes
-		}
+		getFilesNames().then(newDatas => {
+			// Verificar que hayan nuevos componentes
+			if (!areEquals(data, newDatas)) {
+				// Y enviar solo la diferencia
+				newDatas = diffArray(newDatas, data);
+				sendEvent(newDatas);
+				data.push(...newDatas); // actualizar la lista de los componentes
+			}
+		}).catch(err => console.error(`Error on getting files names: ${err}`));
 	}, CMPS_REFRESH); // actualizar información cada cierta cantidad de segundos
 
 	// When client closes connection, stop sending events
@@ -102,10 +103,10 @@ routing.get("/connect", handleSSE);
 
 /**
  * Retorna el nombre de todos los componentes (nombre de los archivos sin sus extensiones)
- * @returns {Array} array con los nombres de los ficheros en la carpeta components configurada
+ * @returns {Promise<Array>} array con los nombres de los ficheros en la carpeta components configurada
  */
-function getFilesNames() {
-	return glob(
+async function getFilesNames() {
+	return await glob(
 		path.join(CMPNAME, "*.*"),
 		(s) => {
 			const ss = s.split("/");
