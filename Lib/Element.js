@@ -330,7 +330,7 @@ export class Element extends HTMLElement {
 		// Si no existe el atributo, no se hace nada
 		if (!this.hasAttribute(key)) return element;
 
-		function processElement(element){
+		const processElement = (element) => {
 			const { handler, metadata } = element;
 			// Si el valor ha cambiado
 			if (this.getAttribute(key) !== metadata.oldData) {
