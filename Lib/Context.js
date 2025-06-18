@@ -1,9 +1,24 @@
-// Función para ignorar los callbacks
+/**
+ * Función para ignorar los callbacks
+ */
 function __ignoreCallback(){}
 
-
+/**
+ * clase Context
+ * Donde se implementarán toda la lógica de los hooks y utilidades
+ * disponibles en los scripts de los componentes
+ */
 export class Context {
+	// ID auto-incrementable que dará un valor único a cada context en orden de creación
 	static idx = 0;
+
+	/**
+	 * Crea una nueva instancia del Context
+	 * @param {string} cmpName Nombre del componente que está creando el Context
+	 * @param {Function} renderCallback callback para desencadenar un re-renderizado diferido
+	 * @param {Function} hasAttr consultar si el componente contiene o no un atributo
+	 * @param {Function} getAttr obtener el valor de un atributo del componente
+	 */
 	constructor(cmpName, renderCallback, hasAttr, getAttr) {
 		// Nombre para el Context (TODO: para poder guardar estados en el localStorage)
 		this._contextName = `webeact-ctx-${cmpName}-${Context.idx++}`;
@@ -34,7 +49,12 @@ export class Context {
 		this.hasAttribute = hasAttr;
 	}
 
-	// Verificar si existe una función asociada a un atributo
+	/**
+	 * Verificar si existe una función asociada a un atributo
+	 * @param {string} key atributo al que debe de estar registrado
+	 * @param {Function} callback callback a revisar si está registrado
+	 * @returns {boolean} si existe o no el registro de la función dinámica al atributo
+	 */
 	existsDynamicCallback(key, callback){
 		if (this.dynamicCallbacks.has(key)) {
 			const dc = this.dynamicCallbacks.get(key);
@@ -45,8 +65,14 @@ export class Context {
 		return false;
 	}
 
-	// Registrar una funcion que se ejecutará cuando se actualice el estado
-	// de un atributo o slot
+	/**
+	 * Registrar una funcion que se ejecutará cuando se actualice
+	 * el estado de un atributo o slot
+	 * @param {string} key atributo al cuál registrar el callback
+	 * @param {Function} callback función que se ejecutará cada vez que cambie el valor del atributo
+	 * @param {*} metadata metadatos que se van a pasar cómo parámetros a la función
+	 * @param {boolean} ensureNoDuplicates si se debe verificar que el callback existe antes de registrarlo
+	 */
 	registerDynamicCallback(key, callback, metadata = null, ensureNoDuplicates = true) {
 		if (!(ensureNoDuplicates && this.existsDynamicCallback(key, callback)) ){
 			// Callbacks copy (if not exist create new)
@@ -61,8 +87,13 @@ export class Context {
 		}
 	}
 
-	// Quitar una funcion que se había registrado para ejecutarse cuando se actualice el estado
-	// de un atributo o slot
+	/**
+	 * Quitar una funcion que se había registrado
+	 * para ejecutarse cuando se actualice el estado
+	 * de un atributo
+	 * @param {string} key atributo al que se le quiere quitar el callback
+	 * @param {Function} callback función a ser quitada del registro
+	 */
 	unregisterDynamicCallback(key, callback) {
 		if (this.dynamicCallbacks.has(key)) {
 			const callbacks = this.dynamicCallbacks.get(key).filter(
@@ -72,7 +103,14 @@ export class Context {
 		}
 	}
 
-	// Crea una view transition para una actualización dinámica de elementos por updateUI
+	/**
+	 * Crea una view transition para una actualización
+	 * dinámica de elementos por updateUI
+	 * @param {Function} updateUI función que va a actualizar la UI
+	 * @param {Function} readyCallback función que será llamada cuando la transición termine con éxito (si falla no)
+	 * @param {Function} finishedCallback función que será llamada cuando la transición termine
+	 * @returns {ViewTransition} el objeto ViewTransition creado
+	 */
 	useViewTransition(updateUI, readyCallback = __ignoreCallback, finishedCallback = __ignoreCallback) {
 		const transition = document.startViewTransition(updateUI);
 		transition.ready.then(readyCallback)
@@ -80,8 +118,14 @@ export class Context {
 		return transition;
 	}
 
-	// Crea un escucha para Server-Side-Events
-	// (Custom-Events debe ser un objeto donde las key sean el nombre del evento y el valor su callback)
+	/**
+	 * Crea un escucha para Server-Side-Events
+	 * @param {string} source URL desde dónde se envían los eventos
+	 * @param {Function} onMessage función que se llamará para los eventos sin nombre
+	 * @param {Function} onError función que se llamará cuando ocurra un error
+	 * @param {Object} customsEvents objeto con los eventos personalizados (debe ser un objeto donde las key sean el nombre del evento y el valor su callback)
+	 * @returns {EventSource} el objeto EventSource creado
+	 */
 	useSSE(source, onMessage, onError, customsEvents = {}) {
 		const eventSource = new EventSource(source);
 		eventSource.onmessage = onMessage;
@@ -91,8 +135,12 @@ export class Context {
 		return eventSource;
 	}
 
-	// Hook para que una función se ejecute 1 vez (la primera vez)
-	// y después solo cuando cambien sus params
+	/**
+	 * Hook para que una función se ejecute 1 vez (la primera vez)
+	 * y después solo cuando cambien sus params
+	 * @param {*} callback Función que se ejecuta
+	 * @param {*} params Dependencias para que se re-ejecute la función
+	 */
 	useEffect(callback, params) {
 		// 1. Obtener el índice actual y avanzar el contador
 		const currentIndex = this.hookIndex++;
@@ -113,7 +161,12 @@ export class Context {
 		}
 	}
 
-	// Hook para tener un estado reactivo que cuando cambie desencadenará un re-renderizado
+	/**
+	 * Hook para tener un estado reactivo que cuando cambie
+	 * desencadenará un re-renderizado
+	 * @param {*} initialValue Valor inicial para el estado
+	 * @returns {Array} primer valor del array es el valor actual del estado, y el segundo es la función que se usa para actualizar el valor del estado y desencadenar el re-renderizado
+	 */
 	useState(initialValue) {
 		// 1. Obtener el índice actual y avanzar el contador
 		const currentIndex = this.hookIndex++;

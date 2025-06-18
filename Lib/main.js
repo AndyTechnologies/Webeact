@@ -1,5 +1,13 @@
 import { Element } from "/webeact/Element.js";
 
+/**
+ * Helper para SSE
+ * @param {string} url direccion a donse conectarse
+ * @param {Function} onMessage callback para eventos sin nombre
+ * @param {Function} onError callback para errores
+ * @param {Object} events eventos personalizables
+ * @returns {EventSource}
+ */
 function useEventSource(url, onMessage, onError, events = {}) {
 	const eventSource = new EventSource(url);
 	eventSource.onmessage = onMessage;
@@ -10,6 +18,10 @@ function useEventSource(url, onMessage, onError, events = {}) {
 	return eventSource;
 }
 
+/**
+ * Función para el CustomEvent: update
+ * @param {Object} param0 objeto con la key data donde está el array con cada file y su contenido
+ */
 function event_update({ data }) {
 	const files = JSON.parse(data);
 	files.forEach(({filePath, content}) => {
@@ -26,25 +38,14 @@ function event_update({ data }) {
 	});
 }
 
-window.addEventListener("load", () => {
-	let time;
-	useEventSource(
-		"/webeact/connect",
-		({ data }) => {
-			time = Date.now();
-			console.log("Conexión establecida:", data, `-${time}`);
-		},
-		(event) => {
-			console.log("Error en la conexión:", event);
-		},
-		// Custom Events
-		{
-			update: (...args) => {
-				const local = Date.now();
-				console.log(`Init Update Call: ${local - time}`);
-				event_update(...args);
-				console.log(`End Update Call: ${Date.now() - local}`);
-			}
-		}
-	);
-});
+useEventSource(
+	"/webeact/connect",
+	({ data }) => {
+		console.log("Conexión establecida:", data, `-> ${Date.now()}`);
+	},
+	(event) => {
+		console.log("Error en la conexión:", event);
+	},
+	// Custom Events
+	{ update: event_update }
+);

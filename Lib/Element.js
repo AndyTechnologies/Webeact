@@ -1,9 +1,16 @@
 import { Context } from "./Context.js";
 
+/**
+ * Clase base de la que van a heredar todos los web-components
+ */
 export class Element extends HTMLElement {
-	// El tiempo en el que un script externo (importado con src) es nuevamente cargado o recogido desde el cache
-	static SCRIPT_TTL = 5 * 60 * 1000; // 5 minutos
+	// El tiempo en el que un script externo (importado con src) es nuevamente cargado
+	static SCRIPT_TTL = 2 * 60 * 1000; // minutos
 
+	/**
+	 * Crea una instancia de Element con el contenido del componente
+	 * @param {string} source contenido del componente
+	 */
 	constructor(source) {
 		super();
 		this.templateSrc = source; // Contenido del componente
@@ -29,10 +36,13 @@ export class Element extends HTMLElement {
 		this.initLazyLoading();
 	}
 
+	/**
+	 * Renderizado diferido (non-blocking)
+	 */
 	_deferRender() {
 		this.pendingRender = true;
 		queueMicrotask(() => {
-			this.updateDynamicContent(); // o this.render() si usas renderizado manual
+			this.updateDynamicContent();
 			this.pendingRender = false;
 		});
 	}
@@ -50,6 +60,12 @@ export class Element extends HTMLElement {
 		return [];
 	}
 
+	/**
+	 * Callback que se ejecuta si los observedAttributes cambian
+	 * @param {string} _nameAttr nombre del atributo
+	 * @param {*} oldValue viejo valor del atributo
+	 * @param {*} newValue nuevo valor del atributo
+	 */
 	attributeChangedCallback(_nameAttr, oldValue, newValue) {
 		if (oldValue !== newValue) {
 			// Programar re-renderizado
@@ -57,6 +73,10 @@ export class Element extends HTMLElement {
 		}
 	}
 
+	/**
+	 * Re-Ejecutar los Scripts Tag marcados con data-dynamic
+	 * (Reinicia los addEventListeners)
+	 */
 	reexecuteDynamicScripts() {
 		// 1 - Reiniciar contador de hooks antes de cada re-ejecución
 		this.Context.hookIndex = 0;
@@ -75,6 +95,10 @@ export class Element extends HTMLElement {
 		scripts.forEach(this.reexecuteSingleScript.bind(this));
 	}
 
+	/**
+	 * Lógica para re-ejecutar el código de un script
+	 * @param {string} script código del script tag
+	 */
 	async reexecuteSingleScript(script) {
 		const newScript = document.createElement("script");
 
@@ -95,12 +119,17 @@ export class Element extends HTMLElement {
 		}
 	}
 
-	// Se llama cuando el componente esta a 200px del bottom (LazyLoading)
+	/**
+	 * Se llama cuando el componente esta a 200px del bottom (LazyLoading)
+	 * es el 1er renderizado del componente
+	 */
 	loadResources() {
 		this.render(); // rendering content
 	}
 
-	// Función de renderizado inicial (se llama una única vez)
+	/**
+	 * Función de renderizado inicial (se llama una única vez)
+	 */
 	async render() {
 		try {
 			// Cargar template
@@ -126,7 +155,11 @@ export class Element extends HTMLElement {
 		}
 	}
 
-	// Envolver código para inyectar contexto
+	/**
+	 * Envolver código para inyectar contexto
+	 * @param {string} code código a inyectar
+	 * @returns {string} código con el contexto document inyectado
+	 */
 	wrapScriptCode(code) {
 		return `
 	    (function(document) {
@@ -135,7 +168,10 @@ export class Element extends HTMLElement {
 	  `;
 	}
 
-	// Ejecutar script en contexto seguro
+	/**
+	 * Ejecutar script en contexto seguro
+	 * @param {HTMLScriptElement} scriptElement elemento script para agregar al DOM
+	 */
 	executeScript(scriptElement) {
 		// Agregar funciones globales al window
 		Object.entries(this.Context.callbacks).forEach(([name, func]) => {
@@ -153,8 +189,12 @@ export class Element extends HTMLElement {
 		this.shadow.appendChild(scriptElement); // Inyectar al shadowDOM
 	}
 
-	// Procesar scripts (static y dynamic)
+	/**
+	 * Procesar scripts (static y dynamic)
+	 * @param {DocumentFragment} fragment fragmento del documento a analizar
+	 */
 	async processScripts(fragment) {
+		// obtener todos los script tag
 		const scripts = [...fragment.querySelectorAll("script")];
 		// Llama al metodo remove de todos los elementos del array
 		remove_all_from(scripts);
@@ -184,16 +224,25 @@ export class Element extends HTMLElement {
 		}
 	}
 
-	processInlineScript(script, newScript, context = this.shadow) {
+	/**
+	 * Procesar los scripts inline
+	 * @param {HTMLScriptElement} script elemento Script del DOM
+	 * @param {HTMLScriptElement} newScript elemento Script nuevo
+	 */
+	processInlineScript(script, newScript,) {
 		// Inyectar contexto y document
 		const processedCode = this.wrapScriptCode(script.textContent);
 		newScript.textContent = processedCode;
 
 		// Ejecutar script
-		this.executeScript(newScript, context);
+		this.executeScript(newScript);
 	}
 
-	// Procesar scripts externos con caché y TTL
+	/**
+	 * Procesar scripts externos con caché y TTL
+	 * @param {HTMLScriptElement} originalScript elemento Script del DOM
+	 * @param {HTMLScriptElement} newScript elemento Script nuevo
+	 */
 	async processExternalScript(originalScript, newScript) {
 		// 1. Obtener el src del script
 		const src = originalScript.getAttribute("src");
@@ -219,6 +268,11 @@ export class Element extends HTMLElement {
 		this._loadExternalScript(src, newScript);
 	}
 
+	/**
+	 * Hacer fetch para cargar el código del script externo
+	 * @param {string} src Valor del atributo src del script original
+	 * @param {HTMLScriptElement} newScript Elemento script nuevo
+	 */
 	async _loadExternalScript(src, newScript) {
 		try {
 			// 4. Obtener el código del script
@@ -244,7 +298,10 @@ export class Element extends HTMLElement {
 		}
 	}
 
-	// Agregar etiquetas de accesibilidad a los slots
+	/**
+	 * Agregar etiquetas de accesibilidad a los slots
+	 * @param {DocumentFragment} fragment Fragmento del documento dónde se buscan los slot tags
+	 */
 	processSlots(fragment) {
 		const allSlots = fragment.querySelectorAll("slot");
 		allSlots.forEach((slot) => {
@@ -254,44 +311,63 @@ export class Element extends HTMLElement {
 		});
 	}
 
-	// Actualización dinámica basada en callbacks registrados (Con ViewTransition)
+	/**
+	 * Actualización dinámica basada en callbacks registrados
+	 */
 	updateDynamicContent() {
 		this.performUpdate();
 		this.rendered();
 	}
 
+	/**
+	 * Llama a los dynamic callbacks para un atributo y actualiza los metadatas de los element
+	 * @param {string} key atributo a revisar sus callbacks
+	 * @param {Array} item array de elementos con el handler y el metadata
+	 * @returns lista con los elementos actualizados
+	 */
 	performDynamicsCallbacks(key, item) {
 		let element = Array.from(item);
+		// Si no existe el atributo, no se hace nada
+		if (!this.hasAttribute(key)) return element;
 
-		// Para cuando solo es un elemento
-		if (element.length === 1 ){
-			const { handler, metadata } = element[0]; // obtener valores del objeto
-			// Si existe el atributo y el valor ha cambiado
-			if (
-				this.hasAttribute(key) &&
-				this.getAttribute(key) !== metadata.oldData
-			) {
+		function processElement(element){
+			const { handler, metadata } = element;
+			// Si el valor ha cambiado
+			if (this.getAttribute(key) !== metadata.oldData) {
 				try {
 					// Llamar al handler
 					handler(this.getAttribute(key), metadata);
 					// Actualizar el metadata con el nuevo valor del atributo
-					element[0].metadata.oldData = this.getAttribute(key);
+					return this.getAttribute(key);
 				} catch (error) {
 					console.error(`Error en handler para ${key}:`, error);
 				}
 			}
+		}
+
+		// Para cuando solo es un elemento
+		if (element.length === 1 ){
+			element[0].metadata.oldData = processElement(element[0]);
 		}else{
-			// Si son varios,
-			// hacemos un map para generar los nuevos metadata de cada dynamicCallback
+			// Si son varios, hacemos un map para generar
+			// los nuevos metadata de cada dynamicCallback
 			// accediendo a cada elemento individualmente
-			// TODO: se puede optimizar para que no esté haciendo la verificación del atributo por cada elemento
 			element = element.map(e => {
-				return this.performDynamicsCallbacks(key, [e]);
+				return {
+					...e,
+					metadata: {
+						...e.metadata,
+						oldData: processElement(e)
+					}
+				}
 			})
 		}
 		return element;
 	}
 
+	/**
+	 * Re-Ejecutar todos los dynamics callbacks registrados (siempre que hayan cambiados los atributos asociados)
+	 */
 	executeDynamicsCallbacks(){
 		this.Context.dynamicCallbacks.forEach((value, key) => {
 			if (Array.from(value).length > 0)
@@ -299,7 +375,10 @@ export class Element extends HTMLElement {
 		});
 	}
 
-	// Llama a los dynamicCallbacks con el nuevo valor del atributo y re-ejecuta los scripts con data-dynamic
+	/**
+	 * Llama a los dynamicCallbacks con el nuevo valor del atributo
+	 * y re-ejecuta los scripts marcados con data-dynamic
+	 */
 	performUpdate() {
 		// Ejecutar callbacks para los atributos con cambios
 		this.executeDynamicsCallbacks();
@@ -310,7 +389,10 @@ export class Element extends HTMLElement {
 
 	/* Metodos Auxiliares */
 
-	// Lazy loading con IntersectionObserver
+	/**
+	 * Lazy loading con IntersectionObserver
+	 * Hace que el componente se renderice por primera vez solo si está visible
+	 */
 	initLazyLoading() {
 		if (!("IntersectionObserver" in window)) {
 			this.loadResources(); // IntersectionObserver no soportado, cargar inmediatamente
@@ -334,9 +416,18 @@ export class Element extends HTMLElement {
 
 // UTILS FUNCTIONS
 
+/**
+ * Remover del DOM una lista de HTMLElement's
+ * @param {Array} listOfElements lista de HTMLElement's a ser removidos del DOM
+ */
+function remove_all_from(listOfElements)
+{ Array.from(listOfElements).forEach((e) => e.remove()); }
 
-function remove_all_from(listOfElements) { Array.from(listOfElements).forEach((e) => e.remove()); }
-
+/**
+ * Copiar los atributos de un elemento a otro
+ * @param {HTMLElement} source elemento desde el que se copian
+ * @param {HTMLElement} dest elemento hacia el que se copian
+ */
 function copyAttrs(source, dest) {
 	source.getAttributeNames().forEach((name) => {
 		dest.setAttribute(name, source.getAttribute(name));

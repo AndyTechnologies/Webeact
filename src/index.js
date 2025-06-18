@@ -1,32 +1,59 @@
 import glob from "./iglob.js";
-import router from "./router.js";
+import { diffArray, areEquals } from "./array_utils.js";
 import cacheEngine from "./view-cache.js";
 import path from "path";
+
+import router from "./router.js";
 const routing = router();
 
+/**
+ * Carga una variable de entorno o retrona un path absoluto al elseName
+ * @param {string} envKey Llave de la variable de entorno a cargar
+ * @param {string} elseName path que se junta al process.cwd si la variable de entorno no existe
+ * @returns {*} valor final extraída desde la variable de entorno
+ */
 function _loadEnv(envKey, elseName){
-	return _envOr(envKey, path.join(process.cwd(), elseName));
+	const res = _envOr(envKey, path.join(process.cwd(), elseName));
+	console.log(`[LOAD ENV]: ${envKey}: ${res}`);
+	return res;
 }
 
+/**
+ * Carga una variable de entorno o retrona elseValue
+ * @param {string} envKey Llave de la variable de entorno a cargar
+ * @param {*} elseValue valor a retronar si no existe la variable de entorno
+ * @returns {*} el valor de la variable de entorno envKey o el valor elseValue
+ */
 function _envOr(envKey, elseValue){
 	return process.env[envKey] || elseValue;
 }
 
-const CMPNAME = _loadEnv("COMPONENTS_DIRECTORY", "components");
-const LIBNAME = _loadEnv("LIB_DIRECTORY", "Lib");
+/**
+ * Path del directorio de donde se cargan los componentes (configurable)
+ */
+let CMPNAME = _loadEnv("COMPONENTS_DIRECTORY", "components");
+/**
+ * La dirección de dónde se cargan los archivos del cliente necesarios para webeact
+ */
+const LIBNAME = path.join(process.cwd(), "node_modules/webeact/Lib");
+/**
+ * El ratio de refresco para detectar componentes nuevos
+ */
 const CMPS_REFRESH = _envOr("CMPS_REFRESH", (2.5 * 1000)); // 2.5 segundos
-const PRODUCTION = true;
+/**
+ * Si es en producción o no
+ */
+const PRODUCTION = _envOr("PRODUCTION", true);
 
 // Servir todos los scripts del lib
 routing.use_static(LIBNAME);
-routing.use(cacheEngine({
-	viewsDirectory: CMPNAME,
-	cacheSize: 25,
-	isProduction: PRODUCTION || process.env.NODE_ENV === "production",
-	streaming: true
-}));
 
-routing.get("/connect", async (req, res) => {
+/**
+ * Habilita el SSE (server side events / eventos enviados desde el servidor)
+ * @param {Request} req Información sobre la petición
+ * @param {Response} res Información sobre la respuesta
+ */
+async function handleSSE(req,res) {
 	// Cabeceras necesarias para el SSE
 	res.setHeader("Content-Type", "text/event-stream");
 	res.setHeader("Cache-Control", "no-cache");
@@ -34,9 +61,11 @@ routing.get("/connect", async (req, res) => {
 
 	// Mandar un mensaje inicial al cliente
 	res.write(`data: Webeact SSE\n\n`);
+	// lógica de mandar un evento con los datos de los ficheros
 	const sendEvent = async (data) => {
 		let data2send = [];
-		for (const filePath of Array.from(data)){
+		for (const filePath of Array.from(data)) {
+			// por cada fichero de componente obtenemos su nombre y su contenido
 			data2send.push({
 				filePath,
 				content: await res.webeactViewContent(`${filePath}.html`)
@@ -45,15 +74,20 @@ routing.get("/connect", async (req, res) => {
 		res.write(`event: update\n`);
 		res.write(`data: ${JSON.stringify(data2send)}\n\n`);
 	};
+
 	// mandar un mensaje con los archivos detectados
-	let data = getFilesNames();
+	let data = getFilesNames(); // cacheamos los archivos ya enviados
 	sendEvent(data);
+
 	// Y luego actualizar cada cierta cantidad de segundos
 	const intervalId = setInterval(() => {
-		const newDatas = getFilesNames();
-		if( !areEquals(data, newDatas) ){
-			sendEvent(diffArray(newDatas, data));
-			data = newDatas;
+		let newDatas = getFilesNames();
+		// Verificar que hayan nuevos componentes
+		if (!areEquals(data, newDatas)) {
+			// Y enviar solo la diferencia
+			newDatas = diffArray(newDatas, data);
+			sendEvent(newDatas);
+			data.push(...newDatas); // actualizar la lista de los componentes
 		}
 	}, CMPS_REFRESH); // actualizar información cada cierta cantidad de segundos
 
@@ -62,8 +96,14 @@ routing.get("/connect", async (req, res) => {
 		clearInterval(intervalId);
 		res.end();
 	});
-});
+}
 
+routing.get("/connect", handleSSE);
+
+/**
+ * Retorna el nombre de todos los componentes (nombre de los archivos sin sus extensiones)
+ * @returns {Array} array con los nombres de los ficheros en la carpeta components configurada
+ */
 function getFilesNames() {
 	return glob(
 		path.join(CMPNAME, "*.*"),
@@ -73,47 +113,32 @@ function getFilesNames() {
 		});
 }
 
+/**
+ * @typedef WebeactMiddlewareOptions
+ * @property {boolean} alwaysCallToNext siempre llamar al siguiente handler (next)
+ * @property {boolean} logRequest imprimir en consola información relevante de las requests
+ * @property {string} componentsDirectory cambiar el directorio donde se buscan los componentes (por defecto 'components')
+ */
+
 
 /**
- * Retorna los elementos de diferencia entre el arr1 y el arr2
- * @param {Array} arr1 Array a la izquierda de la comparación
- * @param {Array} arr2 Array a la derecha de la comparación
- * @returns {Array} Elementos que están en el arr1 y no en el arr2
+ * Crear el middleware para el servidor (lógica de webeact)
+ * @param {WebeactMiddlewareOptions} options objeto con opciones varias
+ * @returns {Function} middleware con la logica del router interno
  */
-function diffArray(arr1, arr2){
-	return arr1.filter(v => {return !arr2.includes(v)});
-}
-
-/**
- * Verifica que dos arrays sean iguales o no
- * @param {Array} arr1 Array a la izquierda de la comparación
- * @param {Array} arr2 Array a la derecha de la comparación
- */
-function areEquals(arr1, arr2){
-	// Si son la misma referencia, retorna true
-	if( arr1 === arr2 ) return true;
-	// Si sus longitudes son iguales
-	if( arr1.length === arr2.length )
-		// Por cada elemento del arr1
-		for(const a of arr1){
-			// Verificar que existe en arr2
-			if(!arr2.includes(a)) return false;
-		}
-	return true;
-}
-
-/*
-Options:
-	alwaysCallToNext: after call to the middleware router, always call to the next handler (false)
-	logRequest: show request url informations before call middleware
-*/
 export function createMiddleware(
-	options = { alwaysCallToNext: false, logRequest: false },
+	options = { alwaysCallToNext: false, logRequest: false, componentsDirectory: CMPNAME },
 ) {
+	CMPNAME = options.componentsDirectory || CMPNAME;
+	routing.use(cacheEngine({
+		viewsDirectory: options.componentsDirectory || CMPNAME,
+		cacheSize: 25,
+		isProduction: PRODUCTION || process.env.NODE_ENV === "production"
+	}));
+
 	return (req, res, next) => {
 		if (options.logRequest)
 			console.log(`[LOG] - Request ${req.originalUrl} from ${req.ip}`);
-		// if the router don´t catch the request, call to next
 		if (!routing.middleware(req, res, next) || options.alwaysCallToNext) next();
 	};
 }

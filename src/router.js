@@ -15,14 +15,22 @@ const mimeTypes = {
 	".ico": "image/x-icon",
 };
 
-// =======================
-// 1. Middleware para servir archivos estáticos
-// =======================
+/**
+ * Retorna la URL de la petición host
+ * @param {Request} req Información de la petición web
+ * @returns {string} url que pide la petición
+ */
 function parseURL(req){
 	const parsed = new URL(req.url, `http://${req.headers.host}`);
 	return decodeURIComponent(parsed.pathname);
 }
 
+/**
+ * Hace seguro el uso de una dirección, haciendo que no salga de una ruta (absRoot)
+ * @param {string} pathname path a ser sanitizado
+ * @param {string} absRoot path desde el cuál no podrán salir las rutas del pathname
+ * @returns el pathname sanitizado
+ */
 function sanitizePath(pathname, absRoot){
 	// Normalize + quitar "../" + eliminar slash inicial
 	let safe = path.normalize(pathname).replace(/^(\.\.(\/|\\))+/g, "");
@@ -30,6 +38,11 @@ function sanitizePath(pathname, absRoot){
 	return path.join(absRoot, safe);
 }
 
+/**
+ * Crea y retorna un middleware que sirve los archivos estáticos en la carpeta rootDir
+ * @param {string} rootDir Directorio dónde se van a servir los archivos estáticos
+ * @returns {Function} middleware que sirve archivos estáticos
+ */
 function serveStatic(rootDir) {
 	// Asegurarnos de tener la ruta absoluta de la raíz
 	const absRoot = path.resolve(rootDir);
@@ -133,6 +146,11 @@ function serveStatic(rootDir) {
 // =======================
 // 2. Sistema de rutas manual
 // =======================
+
+/**
+ * clase Router
+ * contiene la lógica de routing del lado del servidor.
+ */
 export class Router {
 	constructor() {
 		this.routes = {
@@ -145,6 +163,10 @@ export class Router {
 		this.middlewares = [];
 	}
 
+	/**
+	 * Registra una función para que sea llamada antes de procesar cualquier petición
+	 * @param {Function} handler función que representará un middleware
+	 */
 	use(handler) {
 		if (typeof handler !== "function") {
 			throw new Error(
@@ -154,10 +176,16 @@ export class Router {
 		this.middlewares.push(handler);
 	}
 
+	/**
+	 * Registra una función para que sea llamada siempre que el method y route de la request macheen
+	 * @param {'GET'|'POST'|'DELETE'|'PUT'|'STATIC'} method metodo desde el que se tendrá que registrar la ruta para lanzar el handler.
+	 * @param {string} route ruta que debe coincidir para que se lance el handler
+	 * @param {Function} handler función encargada de manejar las peticiones que macheen con la route y el method
+	 */
 	set(method, route, handler) {
 		// Si existe el method
 		if (Object.keys(this.routes).includes(method)) {
-			// Y si no está ya registrado la misma ruta
+			// Y si no está ya registrada la misma ruta
 			if (
 				Array.from(this.routes[method]).findIndex(
 					(item) => item.path === route,
@@ -167,19 +195,47 @@ export class Router {
 		}
 	}
 
+	/**
+	* Helper para registrar un handler a una ruta con el método GET
+	* @param {string} route ruta que debe coincidir para que se lance el handler
+	* @param {Function} handler función encargada de manejar las peticiones que macheen con la route y sea GET
+	 */
 	get(route, handler) {
 		this.set("GET", route, handler);
 	}
+
+	/**
+	* Helper para registrar un handler a una ruta con el método POST
+	* @param {string} route ruta que debe coincidir para que se lance el handler
+	* @param {Function} handler función encargada de manejar las peticiones que macheen con la route y sea POST
+	 */
 	post(route, handler) {
 		this.set("POST", route, handler);
 	}
+
+	/**
+	* Helper para registrar un handler a una ruta con el método PUT
+	* @param {string} route ruta que debe coincidir para que se lance el handler
+	* @param {Function} handler función encargada de manejar las peticiones que macheen con la route y sea PUT
+	 */
 	put(route, handler) {
 		this.set("PUT", route, handler);
 	}
+
+	/**
+	* Helper para registrar un handler a una ruta con el método DELETE
+	* @param {string} route ruta que debe coincidir para que se lance el handler
+	* @param {Function} handler función encargada de manejar las peticiones que macheen con la route y sea DELETE
+	 */
 	delete(route, handler) {
 		this.set("DELETE", route, handler);
 	}
 
+	/**
+	* Helper para registrar un handler a una ruta y con cualquier method
+	* @param {string} route ruta que debe coincidir para que se lance el handler
+	* @param {Function} handler función encargada de manejar las peticiones que macheen con la route
+	 */
 	all(route, handler) {
 		this.get(route, handler);
 		this.post(route, handler);
@@ -187,22 +243,36 @@ export class Router {
 		this.delete(route, handler);
 	}
 
+	/**
+	 * Helper para crear el middleware de servir archivos estáticos
+	 * @param {string} pathname Path desde el que se van a servir los archivos estáticos
+	 * @returns middleware para servir archivos estáticos
+	 */
 	get_static(pathname){
 		return serveStatic(pathname);
 	}
 
+	/**
+	 * Helper para crear y registrar el middleware de servir archivos estáticos
+	 * @param {string} pathname Path desde el que se van a servir los archivos estáticos
+	 */
 	use_static(pathname){
 		this.use(this.get_static(pathname))
 	}
 
-	// Middleware que ejecuta las rutas
+	/**
+	 * Middleware que ejecuta las rutas
+	 * @param {Request} req información de la petición
+	 * @param {Response} res información de la respuesta
+	 * @returns {boolean} false si se debe llamar al next
+	 */
 	async middleware(req, res) {
 		const parsedUrl = url.parse(req.url, true);
 		const { pathname } = parsedUrl;
 		const method = req.method;
 		let route_result = true;
 
-		// Execute all middlewares
+		// Ejecuta todos los middlewares registrados
 		for (let idx = 0; idx < this.middlewares.length; idx++) {
 			const clbk = this.middlewares[idx];
 			const result = await clbk(req, res, () => {});
@@ -236,7 +306,11 @@ export class Router {
 		return route_result;
 	}
 
-	// Convierte rutas como /user/:id a expresiones regulares
+	/**
+	 * Convierte rutas como /user/:id a expresiones regulares
+	 * @param {string} path Dirección a ser convertida a Regex
+	 * @returns {Object} Objeto con pattern: Regex para la ruta pasada
+	 */
 	_pathToRegExp(path) {
 		const keys = [];
 		const pattern = path
@@ -248,7 +322,12 @@ export class Router {
 		return { pattern: new RegExp(`^${pattern}$`), keys };
 	}
 
-	// Extrae parámetros de la URL (ej: /user/123 → { id: '123' })
+	/**
+	 * Extrae parámetros de la URL (ej: /user/123 → { id: '123' })
+	 * @param {string} routePath Path de la ruta (para sacar la regex)
+	 * @param {string} actualPath el path con el valor
+	 * @returns {Object} los parámetros de la ruta
+	 */
 	_extractParams(routePath, actualPath) {
 		const { pattern, keys } = this._pathToRegExp(routePath);
 		const matches = actualPath.match(pattern);
@@ -260,6 +339,10 @@ export class Router {
 	}
 }
 
+/**
+ * Helper para crear un objeto Router
+ * @returns nueva instancia del router
+ */
 export default function router() {
 	return new Router();
 }
