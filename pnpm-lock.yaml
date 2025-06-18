@@ -650,7 +650,7 @@ packages:
     engines: {node: '>= 0.8'}
 
   webeact@file:webeact-0.2.5.tgz:
-    resolution: {integrity: sha512-N3bhYzo6yxNjwiZN5jVaOEBRDJcPAE29dHFSX+PnKNCxrqs9QHD0gM+kF5a3Pqj7+m0Yy5lXQ2qSxzq2RiF4yw==, tarball: file:webeact-0.2.5.tgz}
+    resolution: {integrity: sha512-56eavU4Bx5UvPv0/C5t8fzlsm/Tmq22WxZPsEqb7Hdvf40hNPdqiEcwaQJknm3jAv5M4t4uDJabQI4MlfQ2h3g==, tarball: file:webeact-0.2.5.tgz}
     version: 0.2.5
     engines: {node: '>= 23.0.0'}
 

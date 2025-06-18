@@ -1,15 +1,16 @@
 {
   "name": "webeact",
-  "version": "0.2.5",
+  "version": "0.2.7",
   "description": "Una librería para construir interfaces reactivas con web components, inspirada en los hooks de React/Preact y en las template de Astro. Optimizada para integración con servidores",
   "main": "src/index.js",
   "type": "module",
   "sideEffects": false,
   "scripts": {
     "start": "node --run dev",
-    "dev": "pnpm pack && pnpm -r dev",
+    "dev": "pnpm run prepare-run && pnpm -r dev",
     "prepack": "node --run lint",
-    "lint": "eslint --fix ."
+    "lint": "eslint --fix .",
+    "prepare-run": "rm -rf packages/test/node_modules/webeact && pnpm pack && pnpm install"
   },
   "keywords": [
     "web-components",
