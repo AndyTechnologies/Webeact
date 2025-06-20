@@ -1,4 +1,3 @@
-import { Context } from "./Context.js";
 
 /**
  * Clase base de la que van a heredar todos los web-components
@@ -6,6 +5,9 @@ import { Context } from "./Context.js";
 export class Element extends HTMLElement {
 	// El tiempo en el que un script externo (importado con src) es nuevamente cargado
 	static SCRIPT_TTL = 2 * 60 * 1000; // minutos
+
+	/** @type {null|function(...args):Context} */
+	static ContextObject = null;
 
 	/**
 	 * Crea una instancia de Element con el contenido del componente
@@ -21,19 +23,44 @@ export class Element extends HTMLElement {
 		this.scriptCache = new Map(); // Blobs de scripts (cache de scripts externos)
 		this.intersectionObserver = null; // Observer del ViewPort (para lazy loading)
 
-		// Necesarios para el Context
-		this.Context = new Context(
-			this.tagName,
-			this._deferRender.bind(this),
-			this.hasAttribute.bind(this),
-			this.getAttribute.bind(this)
-		);
+		// Si no se ha creado el Context Creator
+		if(Element.ContextObject === null){
+			import("./Context.js").then(({Context}) => {
+				Element.ContextObject = (...args) => new Context(...args);
+				this._Context = Element.ContextObject(
+					this.tagName,
+					this._deferRender.bind(this),
+					this.hasAttribute.bind(this),
+					this.getAttribute.bind(this)
+				);
+			})
+			.catch(reason => console.error(`Error creando el contexto dinámicamente: ${reason}`))
+			.finally(() => {
+				// Iniciar carga diferida
+				this.initLazyLoading();
+			})
+		}else{
+			// Creo el context
+			this._Context = Element.ContextObject(
+				this.tagName,
+				this._deferRender.bind(this),
+				this.hasAttribute.bind(this),
+				this.getAttribute.bind(this)
+			);
+			// Iniciar carga diferida
+			this.initLazyLoading();
+		}
 
-		// Extensión del contexto por componentes hijos
-		this.extendContext();
+	}
 
-		// Iniciar carga diferida
-		this.initLazyLoading();
+	/**
+	 * @returns {Context}
+	 */
+	get Context(){
+		if( !this._Context ){
+			throw new Error("Error: el contexto no ha sido creado!");
+		}
+		return this._Context;
 	}
 
 	/**
@@ -53,8 +80,6 @@ export class Element extends HTMLElement {
 	rendered() { }
 	// Se llama cuando el componente se conecta al DOM
 	onConnected() { }
-	// Extender el contexto (para extender funciones y variables)
-	extendContext() { }
 	// API de WC: Atributos por los que se va a disparar el attributeChangedCallback
 	static get observedAttributes() {
 		return [];
@@ -78,20 +103,14 @@ export class Element extends HTMLElement {
 	 * (Reinicia los addEventListeners)
 	 */
 	reexecuteDynamicScripts() {
-		// 1 - Reiniciar contador de hooks antes de cada re-ejecución
+		// Reiniciar contador de hooks antes de cada re-ejecución
 		this.Context.hookIndex = 0;
 
-		// 2 - Reiniciar addEventListeners de todos los elementos hijos del ShadowDOM
-		this.shadow.querySelectorAll("*").forEach((elmnt) => {
-			const e = elmnt.cloneNode(true);
-			elmnt.parentNode.replaceChild(e, elmnt);
-		});
-
-		// 3 - Limpiar scrips para evitar duplicados
+		// Limpiar scrips para evitar duplicados
 		const scripts = [...this.shadow.querySelectorAll("script[data-dynamic]")];
 		scripts.forEach((script) => script.remove()); // `remove` del DOM
 
-		// 4 - por cada script, hacer una copia y re-insertarlo al shadowDOM (para que se vuelva a ejecutar)
+		// por cada script, hacer una copia y re-insertarlo al shadowDOM (para que se vuelva a ejecutar)
 		scripts.forEach(this.reexecuteSingleScript.bind(this));
 	}
 
@@ -186,7 +205,11 @@ export class Element extends HTMLElement {
 		window.ctx = this.Context;
 		// Añadir referencia al this en el window
 		window.component = this;
-		this.shadow.appendChild(scriptElement); // Inyectar al shadowDOM
+		// Añadir referencia al document
+		window.doc = this.shadow;
+		this.Context.wrap(() => {
+			this.shadow.appendChild(scriptElement); // Inyectar al shadowDOM
+		});
 	}
 
 	/**
@@ -432,4 +455,13 @@ function copyAttrs(source, dest) {
 	source.getAttributeNames().forEach((name) => {
 		dest.setAttribute(name, source.getAttribute(name));
 	});
+}
+
+/**
+ * Retorna true si el objeto es una promesa o no
+ * @param {*|Promise} obj Objeto a verificar
+ * @returns {boolean}
+ */
+function isPromise(obj) {
+	return typeof obj === 'object' && obj !== null && typeof obj.then === 'function';
 }
