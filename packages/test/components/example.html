@@ -15,32 +15,42 @@ p#count {
 <script data-dynamic>
     // El data-dynamic es para que se re-ejecute en cada re-renderizado
 
-	// Ahora disponible la API del LocalStorage
-	const [getCount, writeCount] = useLocalStorage("counter", 0);
-
     // Utiliza hooks de react como siempre!
 	const [count, setCount] = useState(0, "counter");
 
-    // Misma API
+	// Crea el hook para iniciar una transition cuando se llame a doTransition
+	const [doTransition] = useViewTransition(() => setCount(v => (v <= 0) ? 0 : v - 1));
+
+	// Mejor API para hacer Query's en el documento
+	const counter = useRef(useQuerySelector("#count", false, true));
+
+	// Cambios del DOM los justos!
 	useEffect((cvalue) => {
-		document.querySelector("#count").innerHTML = cvalue;
+		counter.current.innerHTML = cvalue;
 	}, [count]);
 	
-    // Junto a la API del DOM
-	document.querySelector("#counter-plus").addEventListener("click", () => {
-		writeCount(v => v + 1);
- 		setCount(v => v + 1); // No tiene ViewTransition en los cambios
-	});
+	// Nuevas API para trabajar con referencias
+	const minusButton = useRef(useQuerySelector("#counter-minus"));
+
+	// ¡Ya no es necesario limpiar los addEventListener's gracias a la nueva API!
+	useEventListener(
+		"mouseenter", 
+		() => {console.log("\nHover on Button!")}, 
+		"button[id]"
+	);
+
+	useEventListener(
+		"click", () => {setCount(v => v + 1);}, "#counter-plus"
+	);
+
+	// Compatible con las API de referencias
+	useEventListener(
+		"click", () => {doTransition();}, minusButton
+	);
 	
-	document.querySelector("#counter-minus").addEventListener("click", () => {
-        // Y mucho más
-		writeCount(v => v - 1);
-		useViewTransition(() => setCount(v => (v <= 0) ? 0 : v - 1));
-	});
-	
-	// Contenido dinámico
+	// Contenido dinámico en base a atributos del custom element!
 	registerDynamicCallback("title", (nv) => {
-		document.querySelector("slot[name='title']").innerHTML = nv;
+		useQuerySelector("slot[name='title']", false, true).innerHTML = nv;
 	})
 
 </script>
