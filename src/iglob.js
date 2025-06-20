@@ -39,6 +39,7 @@ export function globToRegExp(glob) {
 export async function globAsync(pattern, transform = (a) => a) {
 	const regex = globToRegExp(pattern);
 	const results = [];
+	const rawResults = [];
 
 	async function traverse(currentPath) {
 		try {
@@ -54,6 +55,7 @@ export async function globAsync(pattern, transform = (a) => a) {
 				) {
 					if (entry.isFile()) {
 						results.push(transform(nextPath));
+						rawResults.push(nextPath);
 					}
 				}
 
@@ -67,7 +69,7 @@ export async function globAsync(pattern, transform = (a) => a) {
 	}
 
 	await traverse(process.cwd());
-	return results;
+	return [results, rawResults];
 }
 
 /**
