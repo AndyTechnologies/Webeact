@@ -1,6 +1,6 @@
 import url from "url";
 import path from "path";
-import { promises as fs, createReadStream } from "fs";;
+import { promises as fs, createReadStream, existsSync } from "fs";;
 
 // Mapa de tipos MIME reutilizable
 const mimeTypes = {
@@ -31,11 +31,17 @@ function parseURL(req){
  * @param {string} absRoot path desde el cuál no podrán salir las rutas del pathname
  * @returns el pathname sanitizado
  */
-function sanitizePath(pathname, absRoot){
+async function sanitizePath(pathname, absRoot){
 	// Normalize + quitar "../" + eliminar slash inicial
 	let safe = path.normalize(pathname).replace(/^(\.\.(\/|\\))+/g, "");
 	safe = safe.replace(/^[/\\]+/, "");
-	return path.join(absRoot, safe);
+	let result = path.join(absRoot, safe);
+	// La extensión de archivo por defecto es JavaScript (.js)
+	if( existsSync(result) && (await fs.stat(result)).isDirectory() ){
+		return await sanitizePath("index.js",result);
+	}
+	if( !result.includes(".") ) result = result.concat(".js");
+	return result;
 }
 
 /**
@@ -50,7 +56,7 @@ function serveStatic(rootDir) {
 	return async (req, res) => {
 		try {
 			const pathname = path.resolve(parseURL(req));
-			const filePath = path.resolve(sanitizePath(pathname, absRoot));
+			const filePath = path.resolve(await sanitizePath(pathname, absRoot));
 
 			if (!filePath.startsWith(absRoot + path.sep)) {
 				console.warn("[403] Forbidden path: " + filePath);
