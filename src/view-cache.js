@@ -1,7 +1,7 @@
-import { promises as fs } from 'fs';
+import { promises as fs, existsSync } from 'fs';
 import path from 'path';
 import { LRUCache } from './lru.js';
-
+import { processImports } from './ssi.js';
 
 /**
  * @typedef {Object} CacheEngineOptions
@@ -32,10 +32,15 @@ export function cacheEngine(options = {}) {
 	 * @returns {Promise<string>} contenido del fichero
 	 */
 	async function getViewContent(filePath) {
-		const filePathResolved = path.resolve(path.join(config.viewsDirectory, filePath));
+		let filePathResolved = path.resolve(path.join(config.viewsDirectory, filePath));
+		if( existsSync(filePathResolved) && (await fs.lstat(filePathResolved)).isDirectory() ){
+			return await getViewContent(path.join(filePath, "index.html"));
+		}else if(!existsSync(filePathResolved) && !filePath.endsWith(".html")){
+			return await getViewContent(filePath + ".html");
+		}
 		try {
 			// Verifica que el archivo existe y obtener sus atributos
-			const stats = await fs.stat(filePathResolved);
+			let stats = await fs.stat(filePathResolved);
 
 			// En el modo de producción, verificar la cache
 			if (config.isProduction && templateCache.has(filePathResolved)) {
@@ -52,19 +57,20 @@ export function cacheEngine(options = {}) {
 
 			// Leer el contenido del fichero
 			const content = await fs.readFile(filePathResolved, 'utf-8');
+			const processedContent = await processImports(content, config.viewsDirectory);
 
 			// El contenido del cache, con metadatos
 			const cacheEntry = {
-				content,
+				content: processedContent,
 				mtime: stats.mtime,
-				size: content.length
+				size: processedContent.length
 			};
 
 			if (config.cacheSize > 0) {
 				templateCache.set(filePathResolved, cacheEntry);
 			}
 
-			return content;
+			return processedContent;
 
 		} catch (err) {
 			if (err.code === 'ENOENT') {
