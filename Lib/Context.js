@@ -1,3 +1,15 @@
+import {
+	Hook,
+	useState,
+	useRef,
+	useEffect,
+	useViewTransition,
+	useLocalStorage,
+	useEventListener,
+	useQuerySelector,
+	useMediaQuery
+} from "./hooks";
+
 /**
  * Función para ignorar los callbacks
  */
@@ -20,16 +32,12 @@ export class Context {
 	 * @param {Function} getAttr obtener el valor de un atributo del componente
 	 */
 	constructor(cmpName, renderCallback, hasAttr, getAttr) {
+		// id que representa a este Context
+		this.id = Context.idx++;
 		// Nombre para el Context (TODO: para poder guardar estados en el localStorage)
-		this._contextName = `webeact-ctx-${cmpName}-${Context.idx++}`;
+		this._contextName = `webeact-ctx-${cmpName}-${this.id}`;
 		// Callbacks para ejecutarse cuando se actualice el estado de un atributo
 		this.dynamicCallbacks = new Map();
-		// Almacena los estados por orden
-		this.states = [];
-		// Effects (hook para ejecutar una función cuando cambia un estado)
-		this.effects = [];
-		// Índice actual para los hooks
-		this.hookIndex = 0;
 
 		// Binding del Contexto
 		this.callbacks = {
@@ -37,10 +45,14 @@ export class Context {
 			unregisterDynamicCallback: this.unregisterDynamicCallback.bind(this),
 			/* Hooks */
 			useState: this.useState.bind(this),
-			useEffect: this.useEffect.bind(this),
 			useViewTransition: this.useViewTransition.bind(this),
-			useSSE: this.useSSE.bind(this),
-			useLocalStorage: this.useLocalStorage.bind(this)
+			useLocalStorage: this.useLocalStorage.bind(this),
+			// Hooks as is
+			useEffect,
+			useRef,
+			useEventListener,
+			useQuerySelector,
+			useMediaQuery
 		};
 		// Callback para actualizar el DOM
 		this._render = renderCallback;
@@ -48,6 +60,10 @@ export class Context {
 		this.getAttribute = getAttr;
 		// Callback para verificar si un atributo existe
 		this.hasAttribute = hasAttr;
+	}
+
+	wrap(functionForWrap) {
+		return Hook.withFrame(this._contextName, functionForWrap, {});
 	}
 
 	/**
@@ -110,56 +126,11 @@ export class Context {
 	 * @param {Function} updateUI función que va a actualizar la UI
 	 * @param {Function} readyCallback función que será llamada cuando la transición termine con éxito (si falla no)
 	 * @param {Function} finishedCallback función que será llamada cuando la transición termine
-	 * @returns {ViewTransition} el objeto ViewTransition creado
+	 * @returns {[function,Object]} Un array con la función para iniciar la transición y un objeto con la información del hook
 	 */
 	useViewTransition(updateUI, readyCallback = __ignoreCallback, finishedCallback = __ignoreCallback) {
-		const transition = document.startViewTransition(updateUI);
-		transition.ready.then(readyCallback)
-		transition.finished.then(finishedCallback)
-		return transition;
-	}
-
-	/**
-	 * Crea un escucha para Server-Side-Events
-	 * @param {string} source URL desde dónde se envían los eventos
-	 * @param {Function} onMessage función que se llamará para los eventos sin nombre
-	 * @param {Function} onError función que se llamará cuando ocurra un error
-	 * @param {Object} customsEvents objeto con los eventos personalizados (debe ser un objeto donde las key sean el nombre del evento y el valor su callback)
-	 * @returns {EventSource} el objeto EventSource creado
-	 */
-	useSSE(source, onMessage, onError, customsEvents = {}) {
-		const eventSource = new EventSource(source);
-		eventSource.onmessage = onMessage;
-		eventSource.onerror = onError;
-		// Registrar todos los customs events
-		Object.entries(customsEvents).forEach((event, clbk) => eventSource.addEventListener(event, clbk))
-		return eventSource;
-	}
-
-	/**
-	 * Hook para que una función se ejecute 1 vez (la primera vez)
-	 * y después solo cuando cambien sus params
-	 * @param {*} callback Función que se ejecuta
-	 * @param {*} params Dependencias para que se re-ejecute la función
-	 */
-	useEffect(callback, params) {
-		// 1. Obtener el índice actual y avanzar el contador
-		const currentIndex = this.hookIndex++;
-		const oldEffect = Array.from(this.effects[currentIndex] || []);
-
-		// 2. Si los params son iguales o no
-		let areEquals = (oldEffect[1] && oldEffect[1].length === params.length);
-
-		// 3. Verificar que todos los parámetros sean iguales.
-		const [, oldParams] = oldEffect;
-		for (let i = 0; (i < oldParams?.length) && areEquals; i++)
-			areEquals = Object.is(oldParams[i], params[i]);
-
-		// 4. Si hay diferencias de parámetros, se actualizan los callbacks
-		if(!areEquals){
-			this.effects[currentIndex] = [callback, params];
-			callback(...params);
-		}
+		const [doAction, {hook}] = useViewTransition(updateUI, readyCallback, finishedCallback);
+		return [doAction, hook];
 	}
 
 	/**
@@ -167,42 +138,47 @@ export class Context {
 	 * desencadenará un re-renderizado
 	 * @param {*} initialValue Valor inicial para el estado
 	 * @param {string} storageKey Key opcional para asociar el estado a un valor del localStorage
-	 * @returns {Array} primer valor del array es el valor actual del estado, y el segundo es la función que se usa para actualizar el valor del estado y desencadenar el re-renderizado
+	 * @returns {[*, function(*|function(*):*,Object)]} primer valor del array es el valor actual del estado, y el segundo es la función que se usa para actualizar el valor del estado y desencadenar el re-renderizado
 	 */
 	useState(initialValue, storageKey) {
-		// 1. Obtener el índice actual y avanzar el contador
-		const currentIndex = this.hookIndex++;
+		/**
+		 * Si pasan una storageKey, utilizamos también el localStorage (en el contexto del componente)
+		 */
 		let getter = null, setter = null;
 		if (storageKey !== undefined){
-			[getter, setter] = this.useLocalStorage(storageKey, initialValue);
+			[getter, setter] = this.useLocalStorage(storageKey, initialValue, this._contextName);
 			initialValue = getter();
 		}
 
-		// 2. Inicializar el estado si no está definido
-		if (this.states[currentIndex] === undefined) {
-			this.states[currentIndex] = initialValue;
-		}
+		/**
+		 * Registramos el nuevo Hook useState
+		 */
+		const [getterState, setterState, infoState] = useState(initialValue);
 
-		// 3. Crear función setter
+		/**
+		 * Utiliza un valor (o una función que recibe el anterior valor y retorna uno nuevo) para actualizar el valor del estado
+		 * @param {*|function(*):*} newValue Nuevo valor del estado
+		 */
 		const setState = (newValue) => {
-			// 3.1 Obtener el estado que ya está para evitar accesos innecesarios a memoria
-			const oldState = this.states[currentIndex];
-			// 4. Obtener el valor actual (soportando funciones)
+			// Obtener el estado que ya está para evitar accesos innecesarios a memoria
+			const oldState = getterState();
+			// Obtener el valor actual (soportando funciones)
 			const value = typeof newValue === 'function'
 				? newValue(oldState)
 				: newValue;
 
-			// 5. Solo actualizar si el valor cambia
+			// Solo actualizar si el valor cambia
 			if (!Object.is(oldState, value)) {
-				// 6. Actualizar estado
-				this.states[currentIndex] = value;
+				// Actualizar estado
+				setterState(value);
 				if(setter) setter(value);
-				// 7. Programar re-renderizado
+				// Programar re-renderizado
 				if (this._render) this._render();
 			}
 		};
 
-		return [this.states[currentIndex], setState];
+		// Retornar el valor plano actual, la función para actualizar el estado, y la información del hook
+		return [getterState(), setState, infoState];
 	}
 
 	/**
@@ -210,72 +186,22 @@ export class Context {
 	 * Proporciona acceso de lectura y escritura a localStorage sin dependencias.
 	 * @param {string} key - Clave en localStorage.
 	 * @param {*} initialValue - Valor inicial si no existe en localStorage.
-	 * @returns {[function(): any, function(*|function): void]} - Array con [read, write].
+	 * @returns {[function(): any, function(*|function): void, function(Object|function): void]} - Array con [read, write, patch] (la función patch es sólo para cuando se está trabajando con ebjetos).
 	 */
 	useLocalStorage(key, initialValue) {
-
-		/**
-		 * Cargar los datos del contexto o crear un objeto vacío
-		 * @returns los datos del contexto
-		 */
-		const loadData = () => {
-			let data = window.localStorage.getItem(this._contextName);
-			if (data === null) {
-				data = {};
-				window.localStorage.setItem(this._contextName, JSON.stringify(data));
-			} else {
-				data = JSON.parse(data);
-			}
-			return data;
-		}
-
-		// Inicializar valor en localStorage si no existe
-		try {
-			const data = loadData();
-
-			if (!data[key] && initialValue !== undefined )
-			{ data[key] = initialValue }
-			window.localStorage.setItem(this._contextName, JSON.stringify(data));
-		} catch (err) {
-			console.warn(`useLocalStorage: no se pudo inicializar la clave "${key}":`, err);
-		}
-
-		/**
-		 * Leer valor de localStorage.
-		 * @returns {*} Valor parseado o null.
-		 */
-		const read = () => {
-			try {
-				const data = loadData();
-				let item = null;
-				if( data[key] !== undefined )
-					item = data[key];
-				return item;
-			} catch (err) {
-				console.warn(`useLocalStorage: error al leer la clave "${key}":`, err);
-				return null;
-			}
-		}
-
-		/**
-		 * Escribir valor en localStorage.
-		 * @param {*|function} value - Valor directo o función que recibe el previo y retorna el nuevo.
-		 */
-		const write = (value) => {
-			try {
-				const current = read();
-				const valueToStore = value instanceof Function ? value(current) : value;
-
-				const data = loadData();
-				data[key] = valueToStore;
-				window.localStorage.setItem(this._contextName, JSON.stringify(data));
-			} catch (err) {
-				console.warn(`useLocalStorage: error al escribir la clave "${key}":`, err);
-			}
-		}
-
-		return [read, write];
+		return useLocalStorage(key, initialValue, this._contextName);
 	}
 
+	/**
+	 * useGlobalLocalStorage
+	 * Proporciona acceso de lectura y escritura a localStorage sin dependencias.
+	 * Puede ser accedido desde cualquier componente.
+	 * @param {string} key - Clave en localStorage.
+	 * @param {*} initialValue - Valor inicial si no existe en localStorage.
+	 * @returns {[function(): any, function(*|function): void, function(Object|function): void]} - Array con [read, write, patch] (la función patch es sólo para cuando se está trabajando con ebjetos).
+	 */
+	useGlobalLocalStorage(key, initialValue) {
+		return useLocalStorage("webeact-globals", key, initialValue);
+	}
 
 }
