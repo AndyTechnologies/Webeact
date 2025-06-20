@@ -36,16 +36,27 @@ function event_update({ data }) {
 			}
 		); // define
 	});
+	if(customElements.get("web-main-app")) mountMainApp();
 }
 
-useEventSource(
-	"/webeact/connect",
-	({ data }) => {
-		console.log("Conexión establecida:", data, `-> ${Date.now()}`);
-	},
-	(event) => {
-		console.log("Error en la conexión:", event);
-	},
-	// Custom Events
-	{ update: event_update }
-);
+window.addEventListener("DOMContentLoaded", () => {
+	useEventSource(
+		"/webeact/connect",
+		({ data }) => {
+			console.log("Conexión establecida:", data, `-> ${Date.now()}`);
+		},
+		(event) => {
+			console.log("Error en la conexión:", event);
+		},
+		// Custom Events
+		{ update: event_update }
+	);
+})
+
+
+function mountMainApp(){
+	console.log("Mounting main app...");
+	document.body.prepend(
+		document.createElement("web-main-app")
+	);
+}
