@@ -30,18 +30,22 @@ function _envOr(envKey, elseValue){
 
 /**
  * Path del directorio de donde se cargan los componentes (configurable)
+ * @type {string}
  */
 let CMPNAME = _loadEnv("COMPONENTS_DIRECTORY", "components");
 /**
  * La dirección de dónde se cargan los archivos del cliente necesarios para webeact
+ * @type {string}
  */
 const LIBNAME = path.join(process.cwd(), "node_modules/webeact/Lib");
 /**
  * El ratio de refresco para detectar componentes nuevos
+ * @type {number}
  */
 const CMPS_REFRESH = _envOr("CMPS_REFRESH", (2.5 * 1000)); // 2.5 segundos
 /**
  * Si es en producción o no
+ * @type {boolean}
  */
 const PRODUCTION = _envOr("PRODUCTION", true);
 
@@ -62,13 +66,21 @@ async function handleSSE(req,res) {
 	// Mandar un mensaje inicial al cliente
 	res.write(`data: Webeact SSE\n\n`);
 	// lógica de mandar un evento con los datos de los ficheros
-	const sendEvent = async (data) => {
+	/**
+	 * Envía al cliente la información para montar los web components
+	 * @param {[string]} data Array de los nombres de ficheros
+	 * @param {[string]} raw Array de la ruta de los ficheros
+	 */
+	const sendEvent = async (data, raw) => {
 		let data2send = [];
+		let idx = 0;
 		for (const filePath of Array.from(data)) {
 			// por cada fichero de componente obtenemos su nombre y su contenido
+			console.log(`Sending file: ${filePath}`);
+			const isMainAppIndex = raw[idx++].toLowerCase().includes(path.join(CMPNAME.toLowerCase(),"index.html"));
 			data2send.push({
-				filePath,
-				content: await res.webeactViewContent(`${filePath}.html`)
+				filePath: isMainAppIndex ? "main-app" : filePath,
+				content: await res.webeactViewContent(`${filePath}`)
 			});
 		}
 		res.write(`event: update\n`);
@@ -76,17 +88,17 @@ async function handleSSE(req,res) {
 	};
 
 	// mandar un mensaje con los archivos detectados
-	let data = await getFilesNames(); // cacheamos los archivos ya enviados
-	sendEvent(data);
+	let [data, rawData] = await getFilesNames(); // cacheamos los archivos ya enviados
+	sendEvent(data, rawData);
 
 	// Y luego actualizar cada cierta cantidad de segundos
 	const intervalId = setInterval(() => {
-		getFilesNames().then(newDatas => {
+		getFilesNames().then(([newDatas, newRawDatas]) => {
 			// Verificar que hayan nuevos componentes
 			if (!areEquals(data, newDatas)) {
 				// Y enviar solo la diferencia
 				newDatas = diffArray(newDatas, data);
-				sendEvent(newDatas);
+				sendEvent(newDatas, newRawDatas);
 				data.push(...newDatas); // actualizar la lista de los componentes
 			}
 		}).catch(err => console.error(`Error on getting files names: ${err}`));
@@ -106,12 +118,31 @@ routing.get("/connect", handleSSE);
  * @returns {Promise<Array>} array con los nombres de los ficheros en la carpeta components configurada
  */
 async function getFilesNames() {
-	return await glob(
-		path.join(CMPNAME, "*.*"),
-		(s) => {
-			const ss = s.split("/");
-			return ss[ss.length - 1].split('.')[0].toLowerCase();
-		});
+	/**
+	 *
+	 * @param {string} s FilePath a ser convertido
+	 * @returns {string}
+	 */
+	const names = (s) => {
+		if( s !== `${CMPNAME}/index.html` && s !== `${CMPNAME}` && s !== `${CMPNAME}/`){
+			s = s.replace(CMPNAME, "");
+			s = s.replace("/index.html", "").replace("index.html", "");
+		}
+		const ss = s.split("/");
+		return ss[ss.length - 1].split('.')[0].toLowerCase();
+	}
+	const allDirectoriesComponents = glob(path.join(CMPNAME, "**/index.html"), names);
+	const allComponents = await glob(path.join(CMPNAME, "*.html"), names);
+	return [
+		[
+			...(allComponents[0]),
+			...((await allDirectoriesComponents)[0])
+		],
+		[
+			...(allComponents[1]),
+			...((await allDirectoriesComponents)[1])
+		]
+	];
 }
 
 /**
