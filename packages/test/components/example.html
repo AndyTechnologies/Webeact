@@ -47,10 +47,5 @@ p#count {
 	useEventListener(
 		"click", () => {doTransition();}, minusButton
 	);
-	
-	// Contenido dinámico en base a atributos del custom element!
-	registerDynamicCallback("title", (nv) => {
-		useQuerySelector("slot[name='title']", false, true).innerHTML = nv;
-	})
 
 </script>
