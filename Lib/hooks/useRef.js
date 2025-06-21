@@ -1,5 +1,10 @@
 import { Hook, HookType } from "./hookObject";
 
+/**
+ * Guarda una referencia a un elemento
+ * @param {*} element Elemento a guardar
+ * @returns {{current: *}} la referencia al elemento
+ */
 export function useRef(element){
 	const refHook = new Hook({
 		_elmnt: element,
