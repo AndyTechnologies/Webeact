@@ -3,7 +3,7 @@ import webeact from 'webeact';
 import path from 'path';
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const EXAMPLE_DIR = path.join(process.cwd(), 'public');
 
 app.use("/webeact", webeact({logRequest: true}))
