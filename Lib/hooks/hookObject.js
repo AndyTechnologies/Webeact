@@ -10,7 +10,10 @@ export const HookType = Object.freeze({
 	LocalStorageHook: Symbol("local-storage"),
 	ReferenceHook: Symbol("reference"),
 	EventListenerHook: Symbol("event-listener"),
-	MediaQuery: Symbol("media-query"),
+	MediaQueryHook: Symbol("media-query"),
+	CallbackHook: Symbol("callback"),
+	MemoHook: Symbol("memo"),
+	ReducerHook: Symbol("reducer"),
 });
 
 /**
