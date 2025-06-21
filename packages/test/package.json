@@ -5,7 +5,6 @@
   "main": "src/server.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node --watch-path=public --watch-path=src --watch src/server.js"
   },
   "keywords": [],
