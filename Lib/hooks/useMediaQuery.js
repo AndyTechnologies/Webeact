@@ -9,7 +9,7 @@ export function useMediaQuery(mediaQuery){
 	const mediaQueryHook = new Hook({
 		query: mediaQuery,
 		queryList: window.matchMedia(mediaQuery)
-	}, HookType.MediaQuery);
+	}, HookType.MediaQueryHook);
 
 	let {query, queryList} = mediaQueryHook.get();
 	if( !(query && query === mediaQuery) ){
