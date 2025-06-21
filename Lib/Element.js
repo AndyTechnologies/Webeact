@@ -1,13 +1,10 @@
-
+import { Context } from "./Context.js";
 /**
  * Clase base de la que van a heredar todos los web-components
  */
 export class Element extends HTMLElement {
 	// El tiempo en el que un script externo (importado con src) es nuevamente cargado
 	static SCRIPT_TTL = 2 * 60 * 1000; // minutos
-
-	/** @type {null|function(...args):Context} */
-	static ContextObject = null;
 
 	/**
 	 * Crea una instancia de Element con el contenido del componente
@@ -21,36 +18,15 @@ export class Element extends HTMLElement {
 		// Estados internos
 		this.pendingRender = null; // Renderizado diferido (para no hacer multiples re-renderizados)
 		this.scriptCache = new Map(); // Blobs de scripts (cache de scripts externos)
-		this.intersectionObserver = null; // Observer del ViewPort (para lazy loading)
 
-		// Si no se ha creado el Context Creator
-		if(Element.ContextObject === null){
-			import("./Context.js").then(({Context}) => {
-				Element.ContextObject = (...args) => new Context(...args);
-				this._Context = Element.ContextObject(
-					this.tagName,
-					this._deferRender.bind(this),
-					this.hasAttribute.bind(this),
-					this.getAttribute.bind(this)
-				);
-			})
-			.catch(reason => console.error(`Error creando el contexto dinámicamente: ${reason}`))
-			.finally(() => {
-				// Iniciar carga diferida
-				this.initLazyLoading();
-			})
-		}else{
-			// Creo el context
-			this._Context = Element.ContextObject(
-				this.tagName,
-				this._deferRender.bind(this),
-				this.hasAttribute.bind(this),
-				this.getAttribute.bind(this)
-			);
-			// Iniciar carga diferida
-			this.initLazyLoading();
-		}
-
+		this._Context = new Context(
+			this.tagName,
+			this._deferRender.bind(this),
+			this.hasAttribute.bind(this),
+			this.getAttribute.bind(this)
+		);
+		// Iniciar carga diferida
+		this.render();
 	}
 
 	/**
@@ -139,14 +115,6 @@ export class Element extends HTMLElement {
 	}
 
 	/**
-	 * Se llama cuando el componente esta a 200px del bottom (LazyLoading)
-	 * es el 1er renderizado del componente
-	 */
-	loadResources() {
-		this.render(); // rendering content
-	}
-
-	/**
 	 * Función de renderizado inicial (se llama una única vez)
 	 */
 	async render() {
@@ -164,11 +132,6 @@ export class Element extends HTMLElement {
 			this.shadow.appendChild(this.fragment);
 			// Ejecutar scripts
 			await this.processScripts(this.shadow);
-			// Ejecutar callbacks dinámicos por primera vez
-			this.executeDynamicsCallbacks();
-
-			// Callback extensible
-			this.onConnected();
 		} catch (error) {
 			console.error("Error al cargar el template:", error);
 		}
@@ -181,9 +144,9 @@ export class Element extends HTMLElement {
 	 */
 	wrapScriptCode(code) {
 		return `
-	    (function(document) {
-	      {${code};};
-	    }).call(window.component, window.component.shadow);
+	    {
+			${code};
+		};
 	  `;
 	}
 
@@ -343,97 +306,12 @@ export class Element extends HTMLElement {
 	}
 
 	/**
-	 * Llama a los dynamic callbacks para un atributo y actualiza los metadatas de los element
-	 * @param {string} key atributo a revisar sus callbacks
-	 * @param {Array} item array de elementos con el handler y el metadata
-	 * @returns lista con los elementos actualizados
-	 */
-	performDynamicsCallbacks(key, item) {
-		let element = Array.from(item);
-		// Si no existe el atributo, no se hace nada
-		if (!this.hasAttribute(key)) return element;
-
-		const processElement = (element) => {
-			const { handler, metadata } = element;
-			// Si el valor ha cambiado
-			if (this.getAttribute(key) !== metadata.oldData) {
-				try {
-					// Llamar al handler
-					handler(this.getAttribute(key), metadata);
-					// Actualizar el metadata con el nuevo valor del atributo
-					return this.getAttribute(key);
-				} catch (error) {
-					console.error(`Error en handler para ${key}:`, error);
-				}
-			}
-		}
-
-		// Para cuando solo es un elemento
-		if (element.length === 1 ){
-			element[0].metadata.oldData = processElement(element[0]);
-		}else{
-			// Si son varios, hacemos un map para generar
-			// los nuevos metadata de cada dynamicCallback
-			// accediendo a cada elemento individualmente
-			element = element.map(e => {
-				return {
-					...e,
-					metadata: {
-						...e.metadata,
-						oldData: processElement(e)
-					}
-				}
-			})
-		}
-		return element;
-	}
-
-	/**
-	 * Re-Ejecutar todos los dynamics callbacks registrados (siempre que hayan cambiados los atributos asociados)
-	 */
-	executeDynamicsCallbacks(){
-		this.Context.dynamicCallbacks.forEach((value, key) => {
-			if (Array.from(value).length > 0)
-				this.Context.dynamicCallbacks[key] = this.performDynamicsCallbacks(key, value);
-		});
-	}
-
-	/**
 	 * Llama a los dynamicCallbacks con el nuevo valor del atributo
 	 * y re-ejecuta los scripts marcados con data-dynamic
 	 */
 	performUpdate() {
-		// Ejecutar callbacks para los atributos con cambios
-		this.executeDynamicsCallbacks();
-
 		// Re-ejecutar scripts dinámicos
 		this.reexecuteDynamicScripts();
-	}
-
-	/* Metodos Auxiliares */
-
-	/**
-	 * Lazy loading con IntersectionObserver
-	 * Hace que el componente se renderice por primera vez solo si está visible
-	 */
-	initLazyLoading() {
-		if (!("IntersectionObserver" in window)) {
-			this.loadResources(); // IntersectionObserver no soportado, cargar inmediatamente
-			return;
-		}
-
-		// Crear observer
-		this.intersectionObserver = new IntersectionObserver(
-			(entries) => {
-				if (entries[0].isIntersecting) {
-					this.loadResources();
-					this.intersectionObserver.disconnect(); // Desconectar observer para evitar re-ejecuciones
-				}
-			},
-			{ rootMargin: "0px 0px 200px 0px" }
-		); // Cargar con anticipación (margin: top right bottom left)
-
-		this.intersectionObserver.observe(this); // Observar el componente
 	}
 }
 
@@ -455,13 +333,4 @@ function copyAttrs(source, dest) {
 	source.getAttributeNames().forEach((name) => {
 		dest.setAttribute(name, source.getAttribute(name));
 	});
-}
-
-/**
- * Retorna true si el objeto es una promesa o no
- * @param {*|Promise} obj Objeto a verificar
- * @returns {boolean}
- */
-function isPromise(obj) {
-	return typeof obj === 'object' && obj !== null && typeof obj.then === 'function';
 }
