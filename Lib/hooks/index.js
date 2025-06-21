@@ -10,6 +10,7 @@ import { useMediaQuery } from "./hooks/useMediaQuery";
 import { useCallback } from "./hooks/useCallback";
 import { useMemo } from "./hooks/useMemo";
 import { useReducer } from "./hooks/useReducer";
+import { useId } from "./hooks/useId";
 
 export const HOOKS = {
 	useState,
@@ -23,4 +24,5 @@ export const HOOKS = {
 	useCallback,
 	useMemo,
 	useReducer,
+	useId
 };

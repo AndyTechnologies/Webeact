@@ -14,6 +14,7 @@ export const HookType = Object.freeze({
 	CallbackHook: Symbol("callback"),
 	MemoHook: Symbol("memo"),
 	ReducerHook: Symbol("reducer"),
+	IDHook: Symbol("id"),
 });
 
 /**
