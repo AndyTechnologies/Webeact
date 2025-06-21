@@ -35,8 +35,8 @@ function event_update({ data }) {
 				}
 			}
 		); // define
+		if( filePath === "main-app" && customElements.get("web-main-app") ) mountMainApp();
 	});
-	if(customElements.get("web-main-app")) mountMainApp();
 }
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -53,10 +53,16 @@ window.addEventListener("DOMContentLoaded", () => {
 	);
 })
 
-
+let mainApp = document.querySelector("web-main-app");
 function mountMainApp(){
+	if(mainApp !== null) return;
+
 	console.log("Mounting main app...");
-	document.body.prepend(
-		document.createElement("web-main-app")
-	);
+	mainApp = document.createElement("web-main-app");
+	while(!mainApp) mainApp = document.createElement("web-main-app");
+	try {
+		document.body.prepend(mainApp);
+	} catch (error) {
+		console.error(`Error mounting main app: ${error}`);
+	}
 }
